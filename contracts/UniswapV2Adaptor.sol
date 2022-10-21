@@ -22,16 +22,17 @@ contract UniswapV2Adaptor is IAdaptor {
 	}
 
 	function swap(
-		address,
+		address tokenIn,
 		uint256 amountIn,
 		bytes memory data
 	) external payable {
 		address addr = data.pair();
-		uint256 amount0Out = _quote(addr, amountIn, data);
-		uint256 amount1Out;
+		uint256 amount0Out;
+		uint256 amount1Out = _quote(addr, amountIn, data);
 		if (data.rev()) {
 			(amount0Out, amount1Out) = (amount1Out, amount0Out);
 		}
+		IERC20(tokenIn).transfer(addr, amountIn);
 		IUniswapV2Pair(addr).swap(amount0Out, amount1Out, address(this), "");
 	}
 
@@ -40,9 +41,7 @@ contract UniswapV2Adaptor is IAdaptor {
 		uint256 amountIn,
 		bytes memory data
 	) internal view returns (uint256) {
-		console.log("addr: %s", addr);
 		(uint112 reserveIn, uint112 reserveOut, ) = IUniswapV2Pair(addr).getReserves();
-		console.log("reserveIn: %s, reserveOut: %s", reserveIn, reserveOut);
 		if (data.rev()) {
 			(reserveIn, reserveOut) = (reserveOut, reserveIn);
 		}

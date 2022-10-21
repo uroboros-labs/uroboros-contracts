@@ -5,10 +5,14 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IAdaptor} from "./interfaces/IAdaptor.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
 import {Address} from "./libraries/Address.sol";
+import {RevertReasonParser} from "./libraries/RevertReasonParser.sol";
 
 import "hardhat/console.sol";
 
 contract RouteExecutor {
+	// Route is not included into event, to save gas - it can be later lookuped
+	event RouteExecuted(bytes32 indexed routeId, uint256[] amounts);
+
 	address public immutable adaptorDeployer;
 
 	constructor(address _adaptorDeployer) {
@@ -33,9 +37,7 @@ contract RouteExecutor {
 				require(allowance >= amountOut, "RouteExecutor: allowance not enough");
 			}
 			address adaptor = Address.compute(adaptorDeployer, route[i].adaptorId);
-			// console.log("deployer: %s, nonce: %s, adaptor: %s", adaptorDeployer, route[i].adaptorId, adaptor);
 			require(adaptor.code.length != 0, "RouteExecutor: adaptor not deployed");
-			console.log("i: %s, amountIn: %s", i, amountOut);
 			amountOut = amounts[i] = IAdaptor(adaptor).quote(
 				route[i].tokenIn,
 				amountOut,
@@ -43,6 +45,7 @@ contract RouteExecutor {
 			);
 			if (amounts[i] < route[i].amountOutMin) {
 				for (uint256 j = i; j != ~uint256(0); j--) {
+					// zeroed amounts are skipped
 					amounts[j] = 0;
 					if (route[j].amountIn != 0) {
 						break;
@@ -50,6 +53,40 @@ contract RouteExecutor {
 				}
 			}
 		}
+		amountOut = 0;
+		for (uint256 i; i < route.length; i++) {
+			if (amounts[i] == 0) continue;
+			// check balance somewhere here
+			if (route[i].amountIn > amountOut) {
+				amountOut = route[i].amountIn;
+				IERC20(route[i].tokenIn).transferFrom(msg.sender, address(this), amountOut);
+			}
+			address adaptor = Address.compute(adaptorDeployer, route[i].adaptorId);
+			bytes memory data = abi.encodeWithSelector(
+				IAdaptor.swap.selector,
+				route[i].tokenIn,
+				amountOut,
+				route[i].data
+			);
+			bool success;
+			(success, data) = adaptor.delegatecall(data);
+			require(
+				success,
+				string.concat(
+					"RouteExecutor: adaptor failed to swap: ",
+					RevertReasonParser.parse(data)
+				)
+			);
+		}
+		emit RouteExecuted(_getRouteId(route), amounts);
 		return amounts;
+	}
+
+	function _getRouteId(RoutePart[] memory route) internal pure returns (bytes32) {
+		for (uint256 i; i < route.length; i++) {
+			route[i].amountIn = 0;
+			route[i].amountOutMin = 0;
+		}
+		return keccak256(abi.encode(route));
 	}
 }
