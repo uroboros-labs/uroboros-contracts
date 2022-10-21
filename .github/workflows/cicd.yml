@@ -1,0 +1,15 @@
+name: CI/CD
+on: [push]
+jobs:
+	test:
+		actions:
+			- uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+			- uses: actions/setup-node@v3
+			- run: npm install
+			- run: npm test
