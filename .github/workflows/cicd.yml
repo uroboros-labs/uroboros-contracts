@@ -1,14 +1,14 @@
 name: CI/CD
 on: [push]
 jobs:
-	test:
+  test:
     runs-on: ubuntu-latest
-		steps:
-			- uses: actions/checkout@v3
-			- uses: actions/setup-node@v3
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
       - uses: actions/cache@v3
         with:
           path: ${{ steps.npm-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-			- run: npm install
-			- run: npm test
+      - run: npm install
+      - run: npm test
