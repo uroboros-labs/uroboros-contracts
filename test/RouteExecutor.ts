@@ -1,59 +1,164 @@
 import { ethers } from "hardhat";
-import { RouteExecutor } from "../typechain-types";
+import { encodePacked, padLeft } from "web3-utils";
+import { BigNumberish, BigNumber } from "@ethersproject/bignumber";
+import {
+	ERC20PresetFixedSupply,
+	RouteExecutor,
+	UniswapV2Factory,
+	UniswapV2Pair,
+} from "../typechain-types";
 
-describe("RouteExecutor", () => {
-	it("works", async () => {
-		let signers = await ethers.getSigners();
+let WETH: ERC20PresetFixedSupply,
+	USDC: ERC20PresetFixedSupply,
+	URB: ERC20PresetFixedSupply,
+	wethUsdcPair: UniswapV2Pair,
+	urbUsdcPair: UniswapV2Pair,
+	routeExecutor: RouteExecutor;
 
-		console.log(signers[0].address);
-		console.log(await ethers.provider.call({ data: "0x3260005260206000f3" }));
+async function createUniswapV2Pair(
+	factory: UniswapV2Factory,
+	token0: ERC20PresetFixedSupply,
+	token1: ERC20PresetFixedSupply,
+	reserve0: BigNumberish,
+	reserve1: BigNumberish
+): Promise<UniswapV2Pair> {
+	let pair = await factory
+		.createPair(token0.address, token1.address)
+		.then((creation) => creation.wait())
+		.then((receipt) => {
+			// @ts-ignore
+			let addr = receipt.events[0].args[2];
+			return ethers.getContractAt("UniswapV2Pair", addr);
+		});
 
-		let ERC20PresetFixedSupply = await ethers.getContractFactory("ERC20PresetFixedSupply");
-		let UniswapV2Factory = await ethers.getContractFactory("UniswapV2Factory");
-		let UniswapV2Pair = await ethers.getContractFactory("UniswapV2Pair");
-		let UniswapV2Adaptor = await ethers.getContractFactory("UniswapV2Adaptor");
-		let RouteExecutor = await ethers.getContractFactory("RouteExecutor");
+	await Promise.all([
+		token0.transfer(pair.address, reserve0),
+		token1.transfer(pair.address, reserve1),
+	]);
+	await pair.sync();
 
-		console.log("deployed adaptor:", (await UniswapV2Adaptor.deploy()).address);
-		let WETH = await ERC20PresetFixedSupply.deploy(
+	return pair;
+}
+
+async function init() {
+	let [signer] = await ethers.getSigners();
+
+	let [ERC20PresetFixedSupply, UniswapV2Factory, UniswapV2Pair, UniswapV2Adaptor, RouteExecutor] =
+		await Promise.all([
+			ethers.getContractFactory("ERC20PresetFixedSupply"),
+			ethers.getContractFactory("UniswapV2Factory"),
+			ethers.getContractFactory("UniswapV2Pair"),
+			ethers.getContractFactory("UniswapV2Adaptor"),
+			ethers.getContractFactory("RouteExecutor"),
+		]);
+
+	await UniswapV2Adaptor.deploy();
+
+	[WETH, USDC, URB] = await Promise.all([
+		ERC20PresetFixedSupply.deploy(
 			"Wrapped Ether",
 			"WETH",
-			"1000000000000000000000",
-			signers[0].address
-		);
-		let USDC = await ERC20PresetFixedSupply.deploy("USDC", "USDC", "1000000000000000000000", signers[0].address);
-		let uniswapV2Factory = await UniswapV2Factory.deploy("0x0000000000000000000000000000000000000000");
-		let routeExecutor = await RouteExecutor.deploy(signers[0].address);
+			"100000000000000000000000",
+			signer.address
+		),
+		ERC20PresetFixedSupply.deploy(
+			//
+			"USDC",
+			"USDC",
+			"100000000000000000000000",
+			signer.address
+		),
+		ERC20PresetFixedSupply.deploy(
+			"Uroboros",
+			"URB",
+			"100000000000000000000000",
+			signer.address
+		),
+	]);
 
-		console.log(WETH.address, USDC.address);
+	let zero = "0x0000000000000000000000000000000000000000";
+	let uniswapV2Factory = await UniswapV2Factory.deploy(zero);
+	routeExecutor = await RouteExecutor.deploy(signer.address);
 
-		let wethUsdcPair = await uniswapV2Factory
-			.createPair(WETH.address, USDC.address)
-			.then((creation) => creation.wait())
-			.then((receipt) => {
-				// @ts-ignore
-				return UniswapV2Pair.attach(receipt.events[0].args[2]);
-			});
-
-		console.log("wethUsdcPair: ", wethUsdcPair.address);
-
+	[wethUsdcPair, urbUsdcPair] = await Promise.all([
 		// WETH:USDC = 1:10
-		await WETH.transfer(wethUsdcPair.address, "100000000000000000000");
-		await USDC.transfer(wethUsdcPair.address, "1000000000000000000000");
-		await wethUsdcPair.sync();
+		createUniswapV2Pair(
+			uniswapV2Factory,
+			WETH,
+			USDC,
+			"100000000000000000000",
+			"1000000000000000000000"
+		),
 
-		await WETH.approve(routeExecutor.address, "1000000000000000000");
+		// URB:USDC = 1:2
+		createUniswapV2Pair(
+			uniswapV2Factory,
+			URB,
+			USDC,
+			"100000000000000000000",
+			"200000000000000000000"
+		),
+	]);
+
+	await WETH.approve(routeExecutor.address, "1000000000000000000");
+}
+
+type UniswapV2SwapParams = {
+	pairAddress: string;
+	tokenIn: BigNumberish;
+	tokenOut: BigNumberish;
+	swapFee: number;
+	sellFee: number;
+	buyFee: number;
+};
+
+function encodeUniswapV2Swap(p: UniswapV2SwapParams): string | null {
+	return encodePacked(
+		BigNumber.from(p.tokenIn).lt(p.tokenOut) ? "0x01" : "0x00",
+		padLeft(p.swapFee, 2),
+		padLeft(p.sellFee, 4),
+		padLeft(p.buyFee, 4),
+		p.pairAddress
+	);
+}
+
+describe("RouteExecutor", () => {
+	let initialized = init();
+
+	it("works", async () => {
+		await initialized;
 
 		let route: RouteExecutor.RoutePartStruct[] = [
 			{
 				tokenIn: WETH.address,
 				amountIn: "1000000000000000000",
-				amountOutMin: "0",
-				receiver: wethUsdcPair.address,
+				amountOutMin: 0,
 				adaptorId: 0,
-				data: "0x011900000000" + wethUsdcPair.address.slice(2),
+				data: encodeUniswapV2Swap({
+					pairAddress: wethUsdcPair.address,
+					tokenIn: WETH.address,
+					tokenOut: USDC.address,
+					swapFee: 25,
+					sellFee: 0,
+					buyFee: 0,
+				})!,
+			},
+			{
+				tokenIn: USDC.address,
+				amountIn: 0,
+				amountOutMin: 0,
+				adaptorId: 0,
+				data: encodeUniswapV2Swap({
+					pairAddress: urbUsdcPair.address,
+					tokenIn: USDC.address,
+					tokenOut: URB.address,
+					swapFee: 25,
+					sellFee: 0,
+					buyFee: 0,
+				})!,
 			},
 		];
-		await routeExecutor.execute(route);
+		let amounts = await routeExecutor.callStatic.execute(route);
+		console.log(amounts);
 	});
 });

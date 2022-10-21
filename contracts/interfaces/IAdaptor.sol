@@ -11,7 +11,6 @@ interface IAdaptor {
 	function swap(
 		address tokenIn,
 		uint256 amountIn,
-		bytes memory data,
-		address receiver
+		bytes memory data
 	) external payable;
 }

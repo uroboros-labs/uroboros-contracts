@@ -19,7 +19,6 @@ contract RouteExecutor {
 		address tokenIn;
 		uint256 amountIn;
 		uint256 amountOutMin;
-		address receiver;
 		uint256 adaptorId;
 		bytes data;
 	}
@@ -34,9 +33,14 @@ contract RouteExecutor {
 				require(allowance >= amountOut, "RouteExecutor: allowance not enough");
 			}
 			address adaptor = Address.compute(adaptorDeployer, route[i].adaptorId);
-			console.log("deployer: %s, nonce: %s, adaptor: %s", adaptorDeployer, route[i].adaptorId, adaptor);
+			// console.log("deployer: %s, nonce: %s, adaptor: %s", adaptorDeployer, route[i].adaptorId, adaptor);
 			require(adaptor.code.length != 0, "RouteExecutor: adaptor not deployed");
-			amounts[i] = IAdaptor(adaptor).quote(route[i].tokenIn, amountOut, route[i].data);
+			console.log("i: %s, amountIn: %s", i, amountOut);
+			amountOut = amounts[i] = IAdaptor(adaptor).quote(
+				route[i].tokenIn,
+				amountOut,
+				route[i].data
+			);
 			if (amounts[i] < route[i].amountOutMin) {
 				for (uint256 j = i; j != ~uint256(0); j--) {
 					amounts[j] = 0;

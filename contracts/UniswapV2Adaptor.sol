@@ -18,19 +18,13 @@ contract UniswapV2Adaptor is IAdaptor {
 		uint256 amountIn,
 		bytes memory data
 	) public view returns (uint256) {
-		// bytes32 x;
-		// assembly {
-		// 	x := mload(add(0x20, data))
-		// }
-		// console.log("x: %s", Strings.toHexString(uint256(x)));
 		return _quote(data.pair(), amountIn, data);
 	}
 
 	function swap(
 		address,
 		uint256 amountIn,
-		bytes memory data,
-		address receiver
+		bytes memory data
 	) external payable {
 		address addr = data.pair();
 		uint256 amount0Out = _quote(addr, amountIn, data);
@@ -38,7 +32,7 @@ contract UniswapV2Adaptor is IAdaptor {
 		if (data.rev()) {
 			(amount0Out, amount1Out) = (amount1Out, amount0Out);
 		}
-		IUniswapV2Pair(addr).swap(amount0Out, amount1Out, receiver, "");
+		IUniswapV2Pair(addr).swap(amount0Out, amount1Out, address(this), "");
 	}
 
 	function _quote(
