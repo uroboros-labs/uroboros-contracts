@@ -2,7 +2,7 @@ import { ethers } from "hardhat";
 import { expect } from "chai";
 import {
 	ERC20PresetFixedSupply,
-	RouteExecutor,
+	UniswapV2Adaptor,
 	UniswapV2Pair,
 	UroborusRouter,
 } from "../typechain-types";
@@ -13,7 +13,8 @@ let WETH: ERC20PresetFixedSupply,
 	URB: ERC20PresetFixedSupply,
 	wethUsdcPair: UniswapV2Pair,
 	urbUsdcPair: UniswapV2Pair,
-	routeExecutor: UroborusRouter;
+	routeExecutor: UroborusRouter,
+	uniswapV2Adaptor: UniswapV2Adaptor;
 
 async function init() {
 	let [signer] = await ethers.getSigners();
@@ -26,7 +27,7 @@ async function init() {
 			ethers.getContractFactory("UroborusRouter"),
 		]);
 
-	await UniswapV2Adaptor.deploy();
+	uniswapV2Adaptor = await UniswapV2Adaptor.deploy();
 
 	[WETH, USDC, URB] = await Promise.all([
 		ERC20PresetFixedSupply.deploy(
@@ -83,14 +84,16 @@ describe("RouteExecutor", () => {
 	it("WETH -> USDC -> URB", async () => {
 		await initialized;
 
-		let tokens: string[] = [WETH.address, USDC.address];
+		let tokens: string[] = [WETH.address, USDC.address, URB.address];
 
 		let route: UroborusRouter.PartStruct[] = [
 			{
 				amountIn: "10000000000000000",
 				amountOutMin: 0,
-				tokenId: 0,
-				adaptorId: 0,
+				tokenInId: 0,
+				tokenOutId: 1,
+				// adaptorId: 0,
+				adapter: uniswapV2Adaptor.address,
 				data: encodeUniswapV2Swap({
 					pairAddress: wethUsdcPair.address,
 					tokenIn: WETH.address,
@@ -103,8 +106,10 @@ describe("RouteExecutor", () => {
 			{
 				amountIn: 0,
 				amountOutMin: 0,
-				tokenId: 1,
-				adaptorId: 0,
+				tokenInId: 1,
+				tokenOutId: 2,
+				// adaptorId: 0,
+				adapter: uniswapV2Adaptor.address,
 				data: encodeUniswapV2Swap({
 					pairAddress: urbUsdcPair.address,
 					tokenIn: USDC.address,
@@ -124,14 +129,16 @@ describe("RouteExecutor", () => {
 	it("WETH -> USDC -> URB <amountOutMIn", async () => {
 		await initialized;
 
-		let tokens: string[] = [WETH.address, USDC.address];
+		let tokens: string[] = [WETH.address, USDC.address, URB.address];
 
 		let route: UroborusRouter.PartStruct[] = [
 			{
 				amountIn: "10000000000000000",
 				amountOutMin: 0,
-				tokenId: 0,
-				adaptorId: 0,
+				tokenInId: 0,
+				tokenOutId: 1,
+				// adaptorId: 0,
+				adapter: uniswapV2Adaptor.address,
 				data: encodeUniswapV2Swap({
 					pairAddress: wethUsdcPair.address,
 					tokenIn: WETH.address,
@@ -144,8 +151,10 @@ describe("RouteExecutor", () => {
 			{
 				amountIn: 0,
 				amountOutMin: "19870261882150629",
-				tokenId: 1,
-				adaptorId: 0,
+				tokenInId: 1,
+				tokenOutId: 2,
+				// adaptorId: 0,
+				adapter: uniswapV2Adaptor.address,
 				data: encodeUniswapV2Swap({
 					pairAddress: urbUsdcPair.address,
 					tokenIn: USDC.address,

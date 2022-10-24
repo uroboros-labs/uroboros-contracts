@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: No license
 pragma solidity >=0.8.15;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IAdaptor} from "./interfaces/IAdaptor.sol";
-import {IWETH} from "./interfaces/IWETH.sol";
-import {Address} from "./libraries/Address.sol";
-import {RevertReasonParser} from "./libraries/RevertReasonParser.sol";
-
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./interfaces/IAdaptor.sol";
+import "./libraries/Hex.sol";
 import "hardhat/console.sol";
 
+/// @title Uroborus Router
+/// @author maksfourlife
 contract UroborusRouter {
-	uint256 constant WRAP_ETH = 1;
-	uint256 constant UNWRAP_ETH = 2;
-	uint256 constant MINT = 4;
+	using SafeERC20 for IERC20;
 
-	// Route is not included into event, to save gas - it can be later lookuped
+	/// @param routeId hash of route's token list that are swapped
+	/// @param amounts list of amounts of tokens that are swapped
+	/// @notice Route payload is not stored in an event,
+	/// because it can be restored by locating transaction and parsing calldata
 	event RouteExecuted(bytes32 indexed routeId, uint256[] amounts);
 
+	/// @dev used to compute adaptorAddress: keccak256(rlp([adaptorDeployer, adaptorId]))[12:]
 	address public immutable adaptorDeployer;
 
 	constructor(address _adaptorDeployer) {
@@ -24,107 +25,121 @@ contract UroborusRouter {
 	}
 
 	struct Part {
-		uint256 amountIn; // 32;
-		uint256 amountOutMin; // 32;
-		uint256 tokenInId; // 1
-		uint256 tokenOutId; // 1; tokens length can be inferred by max of those two
-		uint256 adaptorId; // 2;
-		bytes data; // 2; can use dataPtr and dataSize
-		// uint dataSize; // 2
+		uint256 amountIn;
+		uint256 amountOutMin;
+		uint256 tokenInId;
+		uint256 tokenOutId;
+		// uint256 adaptorId;
+		address adapter;
+		bytes data;
 	}
 
-	// Encoding:
-	// 	number of parts
-	// 	parts
-	// 	tokens
-	// 	data
-
-	// can have balances for each token
-
-	function executeRoute(Part[] calldata parts, address[] calldata tokens)
+	function executeRoute(Part[] memory parts, address[] memory tokens)
 		external
 		payable
 		returns (uint256[] memory)
 	{
-		uint256[] memory amounts = new uint256[](parts.length);
-		uint256 amountOut;
 		for (uint256 i; i < parts.length; i++) {
-			address tokenIn = tokens[parts[i].tokenInId];
-			if (parts[i].amountIn > amountOut) {
-				amountOut = parts[i].amountIn;
-				uint256 allowance = IERC20(tokenIn).allowance(msg.sender, address(this));
-				require(allowance >= amountOut, "RouteExecutor: allowance not enough");
+			require(
+				parts[i].tokenInId < tokens.length && parts[i].tokenOutId < tokens.length,
+				"token not provided"
+			);
+		}
+		uint256[] memory amounts = new uint256[](parts.length);
+		// balance is used when no amountIn specified
+		// could use balanceOf, but this is more efficient
+		uint256[] memory balances = new uint256[](tokens.length);
+		for (uint256 i; i < parts.length; i++) {
+			uint256 amountIn = parts[i].amountIn;
+			if (amountIn == 0) {
+				amountIn = balances[parts[i].tokenInId];
+				balances[parts[i].tokenInId] = 0;
 			}
-			address adaptor = Address.compute(adaptorDeployer, parts[i].adaptorId);
-			require(adaptor.code.length != 0, "RouteExecutor: adaptor not deployed");
-			amountOut = amounts[i] = IAdaptor(adaptor).quote(tokenIn, amountOut, parts[i].data);
+			amounts[i] = IAdaptor(parts[i].adapter).quote(
+				tokens[parts[i].tokenInId],
+				amountIn,
+				parts[i].data
+			);
+			balances[parts[i].tokenOutId] += amounts[i];
 			if (amounts[i] < parts[i].amountOutMin) {
-				for (uint256 j = i; j != ~uint256(0); j--) {
-					// zeroed amounts are skipped
+				for (uint256 j = i; j != type(uint256).max; j--) {
 					amounts[j] = 0;
-					if (parts[j].amountIn != 0) {
+					if (parts[j].amountIn != 0 || parts[j].tokenInId == parts[i].tokenOutId) {
 						break;
 					}
 				}
 			}
 		}
-		amountOut = 0;
-		for (uint256 i; i < parts.length; i++) {
-			address tokenIn = tokens[parts[i].tokenInId];
-			if (amounts[i] == 0) continue;
-			// check balance somewhere here
-			if (parts[i].amountIn > amountOut) {
-				amountOut = parts[i].amountIn;
-				IERC20(tokenIn).transferFrom(msg.sender, address(this), amountOut);
-			}
-			address adaptor = Address.compute(adaptorDeployer, parts[i].adaptorId);
-			bytes memory data = abi.encodeWithSelector(
-				IAdaptor.swap.selector,
-				parts[i].tokenInId,
-				amountOut,
-				parts[i].data
-			);
-			bool success;
-			(success, data) = adaptor.delegatecall(data);
-			require(
-				success,
-				string.concat(
-					"RouteExecutor: adaptor failed to swap: ",
-					RevertReasonParser.parse(data)
-				)
-			);
+		bytes memory data = abi.encodeWithSelector(
+			this.executeRouteUnchecked.selector,
+			parts,
+			tokens,
+			amounts
+		);
+		bool success;
+		(success, data) = address(this).delegatecall(data);
+		if (!success && msg.value != 0) {
+			payable(msg.sender).transfer(msg.value);
 		}
-		// bytes32 routeId = getRouteId(parts, tokens, amounts);
-		// emit RouteExecuted(routeId, amounts);
-		return amounts;
+		if (data.length % 32 != 0) {
+			assembly {
+				revert(add(0x20, data), mload(data))
+			}
+		}
+		return abi.decode(data, (uint256[]));
 	}
 
-	function getRouteId(
+	function executeRouteUnchecked(
 		Part[] memory parts,
 		address[] memory tokens,
 		uint256[] memory amounts
-	) internal pure returns (bytes32 _routeId) {
-		uint256 ptr1;
-		assembly {
-			ptr1 := mload(0x40)
-		}
-		uint256 ptr2 = ptr1;
+	) external payable returns (uint256[] memory) {
+		uint256[] memory balances = new uint256[](tokens.length);
 		for (uint256 i; i < parts.length; i++) {
-			if (amounts[i] != 0) {
-				address tokenIn = tokens[parts[i].tokenInId];
-				assembly {
-					mstore(ptr2, tokenIn)
+			if (amounts[i] == 0) {
+				continue;
+			}
+			uint256 amountIn = parts[i].amountIn;
+			address tokenIn = tokens[parts[i].tokenInId];
+			address tokenOut = tokens[parts[i].tokenOutId];
+			if (amountIn == 0) {
+				amountIn = balances[parts[i].tokenInId];
+				balances[parts[i].tokenInId] = 0;
+			} else {
+				if (tokenIn == address(0)) {
+					require(msg.value == amountIn, "invalid msg.value");
+				} else {
+					console.log(
+						"tokenIn: %s, balance: %s, amountIn: %s",
+						tokenIn,
+						IERC20(tokenIn).balanceOf(msg.sender),
+						amountIn
+					);
+					IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
+					balances[parts[i].tokenInId] = IERC20(tokenOut).balanceOf(address(this));
 				}
-				ptr2 += 0x14;
+			}
+			bytes memory data = abi.encodeWithSelector(
+				IAdaptor.swap.selector,
+				tokenIn,
+				amountIn,
+				parts[i].data
+			);
+			bool success;
+			(success, ) = parts[i].adapter.delegatecall(data);
+			balances[parts[i].tokenOutId] = IERC20(tokenOut).balanceOf(address(this));
+			require(
+				balances[parts[i].tokenOutId] >= balances[parts[i].tokenInId],
+				"balance decreased"
+			);
+			amounts[i] = balances[parts[i].tokenOutId] - balances[parts[i].tokenInId];
+			if (!success || amounts[i] < parts[i].amountOutMin) {
+				data = abi.encode(amounts);
+				assembly {
+					revert(add(0x20, data), mload(data))
+				}
 			}
 		}
-		assembly {
-			_routeId := keccak256(ptr1, sub(ptr2, ptr1))
-		}
-		for (; ptr1 <= ptr2; ptr1 += 0x20) {
-			assembly {
-				mstore(ptr1, 0x0)
-			}
-		}
+		return amounts;
 	}
 }

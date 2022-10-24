@@ -9,6 +9,12 @@
 				"useTabs": false,
 				"tabWidth": 2
 			}
+		},
+		{
+			"files": "**/*.sol",
+			"options": {
+				"printWidth": 100
+			}
 		}
 	]
 }
