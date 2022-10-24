@@ -1,6 +1,11 @@
 import { ethers } from "hardhat";
 import { expect } from "chai";
-import { ERC20PresetFixedSupply, RouteExecutor, UniswapV2Pair } from "../typechain-types";
+import {
+	ERC20PresetFixedSupply,
+	RouteExecutor,
+	UniswapV2Pair,
+	UroborusRouter,
+} from "../typechain-types";
 import { createUniswapV2Pair, encodeUniswapV2Swap } from "./utils";
 
 let WETH: ERC20PresetFixedSupply,
@@ -8,7 +13,7 @@ let WETH: ERC20PresetFixedSupply,
 	URB: ERC20PresetFixedSupply,
 	wethUsdcPair: UniswapV2Pair,
 	urbUsdcPair: UniswapV2Pair,
-	routeExecutor: RouteExecutor;
+	routeExecutor: UroborusRouter;
 
 async function init() {
 	let [signer] = await ethers.getSigners();
@@ -18,7 +23,7 @@ async function init() {
 			ethers.getContractFactory("ERC20PresetFixedSupply"),
 			ethers.getContractFactory("UniswapV2Factory"),
 			ethers.getContractFactory("UniswapV2Adaptor"),
-			ethers.getContractFactory("RouteExecutor"),
+			ethers.getContractFactory("UroborusRouter"),
 		]);
 
 	await UniswapV2Adaptor.deploy();
@@ -78,11 +83,13 @@ describe("RouteExecutor", () => {
 	it("WETH -> USDC -> URB", async () => {
 		await initialized;
 
-		let route: RouteExecutor.RoutePartStruct[] = [
+		let tokens: string[] = [WETH.address, USDC.address];
+
+		let route: UroborusRouter.PartStruct[] = [
 			{
-				tokenIn: WETH.address,
 				amountIn: "10000000000000000",
 				amountOutMin: 0,
+				tokenId: 0,
 				adaptorId: 0,
 				data: encodeUniswapV2Swap({
 					pairAddress: wethUsdcPair.address,
@@ -94,9 +101,9 @@ describe("RouteExecutor", () => {
 				})!,
 			},
 			{
-				tokenIn: USDC.address,
 				amountIn: 0,
 				amountOutMin: 0,
+				tokenId: 1,
 				adaptorId: 0,
 				data: encodeUniswapV2Swap({
 					pairAddress: urbUsdcPair.address,
@@ -108,7 +115,7 @@ describe("RouteExecutor", () => {
 				})!,
 			},
 		];
-		let amounts = await routeExecutor.callStatic.execute(route);
+		let amounts = await routeExecutor.callStatic.executeRoute(route, tokens);
 		console.log(amounts);
 		expect(amounts[0].eq("39872025157812017")).eq(true);
 		expect(amounts[1].eq("19870261882150628")).eq(true);
@@ -117,11 +124,13 @@ describe("RouteExecutor", () => {
 	it("WETH -> USDC -> URB <amountOutMIn", async () => {
 		await initialized;
 
-		let route: RouteExecutor.RoutePartStruct[] = [
+		let tokens: string[] = [WETH.address, USDC.address];
+
+		let route: UroborusRouter.PartStruct[] = [
 			{
-				tokenIn: WETH.address,
 				amountIn: "10000000000000000",
 				amountOutMin: 0,
+				tokenId: 0,
 				adaptorId: 0,
 				data: encodeUniswapV2Swap({
 					pairAddress: wethUsdcPair.address,
@@ -133,9 +142,9 @@ describe("RouteExecutor", () => {
 				})!,
 			},
 			{
-				tokenIn: USDC.address,
 				amountIn: 0,
 				amountOutMin: "19870261882150629",
+				tokenId: 1,
 				adaptorId: 0,
 				data: encodeUniswapV2Swap({
 					pairAddress: urbUsdcPair.address,
@@ -147,7 +156,7 @@ describe("RouteExecutor", () => {
 				})!,
 			},
 		];
-		let amounts = await routeExecutor.callStatic.execute(route);
+		let amounts = await routeExecutor.callStatic.executeRoute(route, tokens);
 		console.log(amounts);
 		expect(amounts[0].isZero()).eq(true);
 		expect(amounts[1].isZero()).eq(true);
