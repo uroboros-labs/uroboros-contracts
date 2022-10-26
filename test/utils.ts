@@ -1,30 +1,26 @@
 import { BigNumber, BigNumberish } from "@ethersproject/bignumber";
 import { ethers } from "hardhat";
 import { encodePacked, padLeft } from "web3-utils";
-import { ERC20PresetFixedSupply, UniswapV2Factory, UniswapV2Pair } from "../typechain-types";
+import { ERC20PresetFixedSupply, UniswapV2Pair } from "../typechain-types";
 
 export async function createUniswapV2Pair(
-	factory: UniswapV2Factory,
 	token0: ERC20PresetFixedSupply,
 	token1: ERC20PresetFixedSupply,
-	reserve0: BigNumberish,
-	reserve1: BigNumberish
+	amount0: BigNumberish,
+	amount1: BigNumberish
 ): Promise<UniswapV2Pair> {
-	let pair = await factory
-		.createPair(token0.address, token1.address)
-		.then((creation) => creation.wait())
-		.then((receipt) => {
-			// @ts-ignore
-			let addr = receipt.events[0].args[2];
-			return ethers.getContractAt("UniswapV2Pair", addr);
-		});
-
+	let factory = await ethers.getContractFactory("UniswapV2Pair");
+	let pair = await factory.deploy();
+	if (BigNumber.from(token0.address).gt(token1.address)) {
+		[token0, token1] = [token1, token0];
+		[amount0, amount1] = [amount1, amount0];
+	}
+	await pair.initialize(token0.address, token1.address);
 	await Promise.all([
-		token0.transfer(pair.address, reserve0),
-		token1.transfer(pair.address, reserve1),
+		token0.transfer(pair.address, amount0),
+		token1.transfer(pair.address, amount1),
 	]);
 	await pair.sync();
-
 	return pair;
 }
 

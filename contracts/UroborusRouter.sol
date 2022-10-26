@@ -15,7 +15,7 @@ contract UroborusRouter {
 
 	/// @param routeId hash of route's token list that are swapped
 	/// @param amounts list of amounts of tokens that are swapped
-	/// @notice Route payload is not stored in an event,
+	/// @notice Route payload is not included to event,
 	/// because it can be restored by locating transaction and parsing calldata
 	event RouteExecuted(bytes32 indexed routeId, uint256[] amounts);
 
@@ -41,48 +41,87 @@ contract UroborusRouter {
 		payable
 		returns (uint256[] memory)
 	{
-		for (uint256 i; i < route.length; i++) {
-			require(
-				route[i].tokenInId < tokens.length && route[i].tokenOutId < tokens.length,
-				"TOKEN_NOT_PROVIDED"
-			);
-		}
+		// checkRoute(route, tokens);
 		uint256[] memory amounts = new uint256[](route.length);
 		uint256[] memory balances = new uint256[](tokens.length);
-		for (uint256 i; i < route.length; i++) {
+		// todo skip
+		for (uint256 i; i < route.length; ) {
 			bool useBalance = route[i].amountIn == 0;
 			amounts[i] = IAdaptor(route[i].adaptor).quote(
 				tokens[route[i].tokenInId],
 				useBalance ? balances[route[i].tokenInId] : route[i].amountIn,
 				route[i].data
 			);
-			balances[route[i].tokenOutId] += amounts[i];
 			if (amounts[i] < route[i].amountOutMin) {
-				for (uint256 j; j < route.length; j++)
-					if (route[j].sectionId == route[i].sectionId) amounts[j] = 0;
+				uint256 sectionId = route[i].sectionId;
+				for (i = 0; i < route.length; i++) {
+					if (route[i].sectionId != sectionId) break;
+					amounts[i] = 0;
+				}
+				continue;
 			}
+			balances[route[i].tokenOutId] += amounts[i];
 			if (useBalance) {
 				balances[route[i].tokenInId] = 0;
 			}
+			i++;
+		}
+		// _executeSection(Part[] memory parts, address[] memory tokens)
+		// always pass all tokens
+		bytes memory data = abi.encodeWithSelector(this._executeSection.selector, route, tokens);
+		bool success;
+		(success, data) = address(this).delegatecall(data);
+		return amounts;
+	}
+
+	// function checkRoute(Part[] memory route, address[] memory tokens) internal pure {
+	// 	for (uint256 i; i < route.length; i++) {
+	// 		require(
+	// 			route[i].tokenInId < tokens.length && route[i].tokenOutId < tokens.length,
+	// 			"TOKEN_NOT_PROVIDED"
+	// 		);
+	// 		// OK! 001100, 0022221112220000, 0011221103300
+	// 		// NOT! 01010
+	// 	}
+	// }
+
+	/// Recursively executes nested sections, returns amounts
+	/// @notice should be called from 'executeRoute' function
+	function _executeSection(Part[] memory section, address[] memory tokens)
+		external
+		returns (uint256[] memory)
+	{
+		// this does not work
+		uint256 sectionId = type(uint256).max;
+		uint256[] memory amounts = new uint256[](section.length);
+		for (uint256 i; i < section.length; i++) {
+			if (sectionId != type(uint256).max && section[i].sectionId != sectionId) {
+				uint256 j = i;
+				for (; j < section.length; j++)
+					if (section[j].sectionId != section[i].sectionId) break;
+				uint256 nextLength = j - i; // can it be 0?
+				// if current sectionId differs from previous, find all sections with current sectionId and ...
+				Part[] memory nextSection = new Part[](nextLength);
+				for (j = 0; j < nextLength; j++)
+					//
+					nextSection[j] = section[i + j];
+				bytes memory data = abi.encodeWithSelector(
+					this._executeSection.selector,
+					nextSection,
+					tokens
+				);
+				bool success;
+				(success, data) = address(this).delegatecall(data);
+				uint256[] memory nextAmounts = abi.decode(data, (uint256[]));
+				for (j = 0; j < nextAmounts.length; j++)
+					//
+					amounts[i + j] = nextAmounts[j];
+			} else {
+				// ?
+				sectionId = section[i].sectionId;
+			}
 		}
 		return amounts;
-		// bytes memory data = abi.encodeWithSelector(
-		// 	this.executeRouteUnchecked.selector,
-		// 	route,
-		// 	tokens,
-		// 	amounts
-		// );
-		// bool success;
-		// (success, data) = address(this).delegatecall(data);
-		// if (!success && msg.value != 0) {
-		// 	payable(msg.sender).transfer(msg.value);
-		// }
-		// if (data.length % 32 != 0) {
-		// 	assembly {
-		// 		revert(add(0x20, data), mload(data))
-		// 	}
-		// }
-		// return abi.decode(data, (uint256[]));
 	}
 
 	function executeRouteUnchecked(
