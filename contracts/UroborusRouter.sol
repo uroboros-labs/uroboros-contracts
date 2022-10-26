@@ -4,12 +4,14 @@ pragma solidity >=0.8.15;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IAdaptor.sol";
 import "./libraries/Hex.sol";
+import "./libraries/UrbERC20.sol";
 import "hardhat/console.sol";
 
 /// @title Uroborus Router
 /// @author maksfourlife
 contract UroborusRouter {
 	using SafeERC20 for IERC20;
+	using UrbERC20 for IERC20;
 
 	/// @param routeId hash of route's token list that are swapped
 	/// @param amounts list of amounts of tokens that are swapped
@@ -27,66 +29,60 @@ contract UroborusRouter {
 	struct Part {
 		uint256 amountIn;
 		uint256 amountOutMin;
+		uint256 sectionId;
 		uint256 tokenInId;
 		uint256 tokenOutId;
-		// uint256 adaptorId;
-		address adapter;
+		address adaptor;
 		bytes data;
 	}
 
-	function executeRoute(Part[] memory parts, address[] memory tokens)
+	function executeRoute(Part[] memory route, address[] memory tokens)
 		external
 		payable
 		returns (uint256[] memory)
 	{
-		for (uint256 i; i < parts.length; i++) {
+		for (uint256 i; i < route.length; i++) {
 			require(
-				parts[i].tokenInId < tokens.length && parts[i].tokenOutId < tokens.length,
-				"token not provided"
+				route[i].tokenInId < tokens.length && route[i].tokenOutId < tokens.length,
+				"TOKEN_NOT_PROVIDED"
 			);
 		}
-		uint256[] memory amounts = new uint256[](parts.length);
-		// balance is used when no amountIn specified
-		// could use balanceOf, but this is more efficient
+		uint256[] memory amounts = new uint256[](route.length);
 		uint256[] memory balances = new uint256[](tokens.length);
-		for (uint256 i; i < parts.length; i++) {
-			uint256 amountIn = parts[i].amountIn;
-			if (amountIn == 0) {
-				amountIn = balances[parts[i].tokenInId];
-				balances[parts[i].tokenInId] = 0;
-			}
-			amounts[i] = IAdaptor(parts[i].adapter).quote(
-				tokens[parts[i].tokenInId],
-				amountIn,
-				parts[i].data
+		for (uint256 i; i < route.length; i++) {
+			bool useBalance = route[i].amountIn == 0;
+			amounts[i] = IAdaptor(route[i].adaptor).quote(
+				tokens[route[i].tokenInId],
+				useBalance ? balances[route[i].tokenInId] : route[i].amountIn,
+				route[i].data
 			);
-			balances[parts[i].tokenOutId] += amounts[i];
-			if (amounts[i] < parts[i].amountOutMin) {
-				for (uint256 j = i; j != type(uint256).max; j--) {
-					amounts[j] = 0;
-					if (parts[j].amountIn != 0 || parts[j].tokenInId == parts[i].tokenOutId) {
-						break;
-					}
-				}
+			balances[route[i].tokenOutId] += amounts[i];
+			if (amounts[i] < route[i].amountOutMin) {
+				for (uint256 j; j < route.length; j++)
+					if (route[j].sectionId == route[i].sectionId) amounts[j] = 0;
+			}
+			if (useBalance) {
+				balances[route[i].tokenInId] = 0;
 			}
 		}
-		bytes memory data = abi.encodeWithSelector(
-			this.executeRouteUnchecked.selector,
-			parts,
-			tokens,
-			amounts
-		);
-		bool success;
-		(success, data) = address(this).delegatecall(data);
-		if (!success && msg.value != 0) {
-			payable(msg.sender).transfer(msg.value);
-		}
-		if (data.length % 32 != 0) {
-			assembly {
-				revert(add(0x20, data), mload(data))
-			}
-		}
-		return abi.decode(data, (uint256[]));
+		return amounts;
+		// bytes memory data = abi.encodeWithSelector(
+		// 	this.executeRouteUnchecked.selector,
+		// 	route,
+		// 	tokens,
+		// 	amounts
+		// );
+		// bool success;
+		// (success, data) = address(this).delegatecall(data);
+		// if (!success && msg.value != 0) {
+		// 	payable(msg.sender).transfer(msg.value);
+		// }
+		// if (data.length % 32 != 0) {
+		// 	assembly {
+		// 		revert(add(0x20, data), mload(data))
+		// 	}
+		// }
+		// return abi.decode(data, (uint256[]));
 	}
 
 	function executeRouteUnchecked(
@@ -100,23 +96,23 @@ contract UroborusRouter {
 				continue;
 			}
 			uint256 amountIn = parts[i].amountIn;
-			address tokenIn = tokens[parts[i].tokenInId];
-			address tokenOut = tokens[parts[i].tokenOutId];
+			IERC20 tokenIn = IERC20(tokens[parts[i].tokenInId]);
+			IERC20 tokenOut = IERC20(tokens[parts[i].tokenOutId]);
 			if (amountIn == 0) {
 				amountIn = balances[parts[i].tokenInId];
 				balances[parts[i].tokenInId] = 0;
 			} else {
-				if (tokenIn == address(0)) {
+				if (tokenIn.isETH()) {
 					require(msg.value == amountIn, "invalid msg.value");
 				} else {
 					console.log(
 						"tokenIn: %s, balance: %s, amountIn: %s",
-						tokenIn,
-						IERC20(tokenIn).balanceOf(msg.sender),
+						address(tokenIn),
+						tokenIn.balanceOf(msg.sender),
 						amountIn
 					);
-					IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
-					balances[parts[i].tokenInId] = IERC20(tokenOut).balanceOf(address(this));
+					tokenIn.safeTransferFrom(msg.sender, address(this), amountIn);
+					balances[parts[i].tokenInId] = tokenOut.balanceOf(address(this));
 				}
 			}
 			bytes memory data = abi.encodeWithSelector(
@@ -126,8 +122,8 @@ contract UroborusRouter {
 				parts[i].data
 			);
 			bool success;
-			(success, ) = parts[i].adapter.delegatecall(data);
-			balances[parts[i].tokenOutId] = IERC20(tokenOut).balanceOf(address(this));
+			(success, ) = parts[i].adaptor.delegatecall(data);
+			balances[parts[i].tokenOutId] = tokenOut.balanceOf(address(this));
 			require(
 				balances[parts[i].tokenOutId] >= balances[parts[i].tokenInId],
 				"balance decreased"

@@ -90,10 +90,10 @@ describe("RouteExecutor", () => {
 			{
 				amountIn: "10000000000000000",
 				amountOutMin: 0,
+				sectionId: 0,
 				tokenInId: 0,
 				tokenOutId: 1,
-				// adaptorId: 0,
-				adapter: uniswapV2Adaptor.address,
+				adaptor: uniswapV2Adaptor.address,
 				data: encodeUniswapV2Swap({
 					pairAddress: wethUsdcPair.address,
 					tokenIn: WETH.address,
@@ -106,10 +106,10 @@ describe("RouteExecutor", () => {
 			{
 				amountIn: 0,
 				amountOutMin: 0,
+				sectionId: 0,
 				tokenInId: 1,
 				tokenOutId: 2,
-				// adaptorId: 0,
-				adapter: uniswapV2Adaptor.address,
+				adaptor: uniswapV2Adaptor.address,
 				data: encodeUniswapV2Swap({
 					pairAddress: urbUsdcPair.address,
 					tokenIn: USDC.address,
@@ -135,10 +135,10 @@ describe("RouteExecutor", () => {
 			{
 				amountIn: "10000000000000000",
 				amountOutMin: 0,
+				sectionId: 0,
 				tokenInId: 0,
 				tokenOutId: 1,
-				// adaptorId: 0,
-				adapter: uniswapV2Adaptor.address,
+				adaptor: uniswapV2Adaptor.address,
 				data: encodeUniswapV2Swap({
 					pairAddress: wethUsdcPair.address,
 					tokenIn: WETH.address,
@@ -151,10 +151,10 @@ describe("RouteExecutor", () => {
 			{
 				amountIn: 0,
 				amountOutMin: "19870261882150629",
+				sectionId: 0,
 				tokenInId: 1,
 				tokenOutId: 2,
-				// adaptorId: 0,
-				adapter: uniswapV2Adaptor.address,
+				adaptor: uniswapV2Adaptor.address,
 				data: encodeUniswapV2Swap({
 					pairAddress: urbUsdcPair.address,
 					tokenIn: USDC.address,
