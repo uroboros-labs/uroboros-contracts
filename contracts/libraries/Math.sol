@@ -21,4 +21,10 @@ library Math {
 			z = 1;
 		}
 	}
+
+	function isZero(uint256 value) internal pure returns (bool _true) {
+		assembly {
+			_true := iszero(value)
+		}
+	}
 }

@@ -20,10 +20,14 @@ library UrbERC20 {
 		uint256 amount
 	) internal {
 		if (isETH(token)) {
-			(bool success, ) = to.call{value: amount}("");
-			require(success, "UrbERC20: eth transfer failed");
+			(bool ok, ) = to.call{value: amount}("");
+			require(ok, "UrbERC20: ETH_TRANSFER_FAILED");
 		} else {
 			token.safeTransfer(to, amount);
 		}
+	}
+
+	function selfBalance(IERC20 token) internal view returns (uint256) {
+		return token.balanceOf(address(this));
 	}
 }

@@ -4,6 +4,8 @@ pragma solidity >=0.8.15;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IAdaptor.sol";
 import "./libraries/Hex.sol";
+import "./libraries/Math.sol";
+import "./libraries/SafeMath.sol";
 import "./libraries/UrbERC20.sol";
 import "hardhat/console.sol";
 
@@ -12,6 +14,8 @@ import "hardhat/console.sol";
 contract UroborusRouter {
 	using SafeERC20 for IERC20;
 	using UrbERC20 for IERC20;
+	using Math for uint256;
+	using SafeMath for uint256;
 
 	/// @param routeId hash of route's token list that are swapped
 	/// @param amounts list of amounts of tokens that are swapped
@@ -46,7 +50,7 @@ contract UroborusRouter {
 		uint256[] memory balances = new uint256[](tokens.length);
 		// todo skip
 		for (uint256 i; i < route.length; ) {
-			bool useBalance = route[i].amountIn == 0;
+			bool useBalance = route[i].amountIn.isZero();
 			amounts[i] = IAdaptor(route[i].adaptor).quote(
 				tokens[route[i].tokenInId],
 				useBalance ? balances[route[i].tokenInId] : route[i].amountIn,
@@ -66,115 +70,100 @@ contract UroborusRouter {
 			}
 			i++;
 		}
-		// _executeSection(Part[] memory parts, address[] memory tokens)
-		// always pass all tokens
 		bytes memory data = abi.encodeWithSelector(this._executeSection.selector, route, tokens);
 		bool success;
 		(success, data) = address(this).delegatecall(data);
 		return amounts;
 	}
 
-	// function checkRoute(Part[] memory route, address[] memory tokens) internal pure {
-	// 	for (uint256 i; i < route.length; i++) {
-	// 		require(
-	// 			route[i].tokenInId < tokens.length && route[i].tokenOutId < tokens.length,
-	// 			"TOKEN_NOT_PROVIDED"
-	// 		);
-	// 		// OK! 001100, 0022221112220000, 0011221103300
-	// 		// NOT! 01010
-	// 	}
-	// }
-
 	/// Recursively executes nested sections, returns amounts
-	/// @notice should be called from 'executeRoute' function
+	/// @notice for internal use purposes only
+	/// @dev should be called from 'executeRoute' function or from itself
 	function _executeSection(Part[] memory section, address[] memory tokens)
 		external
 		returns (uint256[] memory)
 	{
-		// this does not work
-		uint256 sectionId = type(uint256).max;
+		uint256 sectionId = section[0].sectionId;
 		uint256[] memory amounts = new uint256[](section.length);
-		for (uint256 i; i < section.length; i++) {
-			if (sectionId != type(uint256).max && section[i].sectionId != sectionId) {
-				uint256 j = i;
-				for (; j < section.length; j++)
-					if (section[j].sectionId != section[i].sectionId) break;
-				uint256 nextLength = j - i; // can it be 0?
-				// if current sectionId differs from previous, find all sections with current sectionId and ...
-				Part[] memory nextSection = new Part[](nextLength);
-				for (j = 0; j < nextLength; j++)
-					//
-					nextSection[j] = section[i + j];
-				bytes memory data = abi.encodeWithSelector(
-					this._executeSection.selector,
-					nextSection,
-					tokens
-				);
-				bool success;
-				(success, data) = address(this).delegatecall(data);
-				uint256[] memory nextAmounts = abi.decode(data, (uint256[]));
-				for (j = 0; j < nextAmounts.length; j++)
-					//
-					amounts[i + j] = nextAmounts[j];
+		for (uint256 i; i < section.length; ) {
+			if (section[i].sectionId != sectionId) {
+				// steps to the end of the section
+				i = _executeNextSection(section, tokens, amounts, i);
 			} else {
-				// ?
-				sectionId = section[i].sectionId;
+				_swapPart(section, tokens, amounts, i);
+				i++;
 			}
 		}
 		return amounts;
 	}
 
-	function executeRouteUnchecked(
-		Part[] memory parts,
+	function _swapPart(
+		Part[] memory section,
 		address[] memory tokens,
-		uint256[] memory amounts
-	) external payable returns (uint256[] memory) {
-		uint256[] memory balances = new uint256[](tokens.length);
-		for (uint256 i; i < parts.length; i++) {
-			if (amounts[i] == 0) {
-				continue;
-			}
-			uint256 amountIn = parts[i].amountIn;
-			IERC20 tokenIn = IERC20(tokens[parts[i].tokenInId]);
-			IERC20 tokenOut = IERC20(tokens[parts[i].tokenOutId]);
-			if (amountIn == 0) {
-				amountIn = balances[parts[i].tokenInId];
-				balances[parts[i].tokenInId] = 0;
-			} else {
-				if (tokenIn.isETH()) {
-					require(msg.value == amountIn, "invalid msg.value");
-				} else {
-					console.log(
-						"tokenIn: %s, balance: %s, amountIn: %s",
-						address(tokenIn),
-						tokenIn.balanceOf(msg.sender),
-						amountIn
-					);
-					tokenIn.safeTransferFrom(msg.sender, address(this), amountIn);
-					balances[parts[i].tokenInId] = tokenOut.balanceOf(address(this));
-				}
-			}
-			bytes memory data = abi.encodeWithSelector(
-				IAdaptor.swap.selector,
-				tokenIn,
-				amountIn,
-				parts[i].data
-			);
-			bool success;
-			(success, ) = parts[i].adaptor.delegatecall(data);
-			balances[parts[i].tokenOutId] = tokenOut.balanceOf(address(this));
-			require(
-				balances[parts[i].tokenOutId] >= balances[parts[i].tokenInId],
-				"balance decreased"
-			);
-			amounts[i] = balances[parts[i].tokenOutId] - balances[parts[i].tokenInId];
-			if (!success || amounts[i] < parts[i].amountOutMin) {
-				data = abi.encode(amounts);
-				assembly {
-					revert(add(0x20, data), mload(data))
-				}
+		uint256[] memory amounts,
+		uint256 i
+	) internal {
+		uint256 amountIn = section[i].amountIn;
+		address tokenIn = tokens[section[i].tokenInId];
+		address tokenOut = tokens[section[i].tokenOutId];
+		// if parts' amountIn not specified, use all avail. balance
+		// else if amountIn is greater than avail., transfer difference
+		if (amountIn.isZero()) {
+			amountIn = IERC20(tokenIn).selfBalance();
+		}
+		bytes memory data = abi.encodeWithSelector(
+			IAdaptor.swap.selector,
+			tokenIn,
+			amountIn,
+			section[i].data
+		);
+		bool ok;
+		uint256 preBalance = IERC20(tokenOut).selfBalance();
+		(ok, ) = section[i].adaptor.delegatecall(data);
+		require(ok);
+		uint256 postBalance = IERC20(tokenOut).selfBalance();
+		amounts[i] = postBalance.sub(preBalance);
+		if (amounts[i] < section[i].amountOutMin) {
+			assembly {
+				revert(add(0x20, amounts), mload(amounts))
 			}
 		}
-		return amounts;
+	}
+
+	function _executeNextSection(
+		Part[] memory section,
+		address[] memory tokens,
+		uint256[] memory amounts,
+		uint256 i
+	) internal returns (uint256) {
+		Part[] memory nextSection = _getNextSection(section, i);
+		bytes memory data = abi.encodeWithSelector(
+			this._executeSection.selector,
+			nextSection,
+			tokens
+		);
+		bool success;
+		(success, data) = address(this).delegatecall(data);
+		uint256[] memory nextAmounts = abi.decode(data, (uint256[]));
+		uint256 j;
+		for (; j < nextAmounts.length; j++) amounts[i + j] = nextAmounts[j];
+		return i + j;
+	}
+
+	/// @param section currently executed section
+	/// @param i current part index
+	/// @return nextSection next section
+	/// @notice called when current parts' sectionId not equals to previos.
+	function _getNextSection(Part[] memory section, uint256 i)
+		internal
+		pure
+		returns (Part[] memory)
+	{
+		uint256 j;
+		for (; j < section.length; j++) if (section[j].sectionId != section[i].sectionId) break;
+		uint256 nextLength = j - i;
+		Part[] memory nextSection = new Part[](nextLength);
+		for (j = 0; j < nextLength; j++) nextSection[j] = section[i + j];
+		return nextSection;
 	}
 }
