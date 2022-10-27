@@ -2,6 +2,7 @@
 pragma solidity >=0.8.15;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./interfaces/IAdaptor.sol";
 import "./libraries/Hex.sol";
 import "./libraries/Math.sol";
@@ -33,7 +34,7 @@ contract UroborusRouter {
 	struct Part {
 		uint256 amountIn;
 		uint256 amountOutMin;
-		uint256 sectionId;
+		uint256 sectionId; // if it's single bit unique integer, can be used in skip mask
 		uint256 tokenInId;
 		uint256 tokenOutId;
 		address adaptor;
@@ -45,50 +46,71 @@ contract UroborusRouter {
 		payable
 		returns (uint256[] memory)
 	{
-		// checkRoute(route, tokens);
+		(uint256[] memory amounts, ) = simulateRoute(route, tokens);
+		return amounts;
+	}
+
+	function simulateRoute(Part[] memory route, address[] memory tokens)
+		internal
+		view
+		returns (uint256[] memory, uint256)
+	{
 		uint256[] memory amounts = new uint256[](route.length);
 		uint256[] memory balances = new uint256[](tokens.length);
-		// todo skip
-		for (uint256 i; i < route.length; ) {
-			bool useBalance = route[i].amountIn.isZero();
+		uint256 skip;
+		for (uint256 i; i < route.length; i++) {
+			if (skip & route[i].sectionId != 0) continue;
+
+			uint256 amountIn = route[i].amountIn;
+			if (amountIn == 0) {
+				amountIn = balances[route[i].tokenInId];
+			} else if (amountIn > balances[route[i].tokenInId]) {
+				balances[route[i].tokenInId] = amountIn;
+			}
+
+			// console.log(
+			// 	"%s.balance=%s",
+			// 	IERC20Metadata(tokens[route[i].tokenInId]).symbol(),
+			// 	balances[route[i].tokenInId]
+			// );
+
 			amounts[i] = IAdaptor(route[i].adaptor).quote(
 				tokens[route[i].tokenInId],
-				useBalance ? balances[route[i].tokenInId] : route[i].amountIn,
+				amountIn,
 				route[i].data
 			);
-			if (amounts[i] < route[i].amountOutMin) {
-				uint256 sectionId = route[i].sectionId;
-				for (i = 0; i < route.length; i++) {
-					if (route[i].sectionId != sectionId) break;
-					amounts[i] = 0;
-				}
-				continue;
-			}
+
+			if (amounts[i] < route[i].amountOutMin) skip |= route[i].sectionId;
+
+			balances[route[i].tokenInId] -= amountIn;
 			balances[route[i].tokenOutId] += amounts[i];
-			if (useBalance) {
-				balances[route[i].tokenInId] = 0;
-			}
-			i++;
+
+			// console.log(
+			// 	"%s->%s",
+			// 	IERC20Metadata(tokens[route[i].tokenInId]).symbol(),
+			// 	IERC20Metadata(tokens[route[i].tokenOutId]).symbol()
+			// );
+			// console.log("%s->%s", amountIn, amounts[i]);
 		}
-		bytes memory data = abi.encodeWithSelector(this._executeSection.selector, route, tokens);
-		bool success;
-		(success, data) = address(this).delegatecall(data);
-		return amounts;
+		return (amounts, skip);
 	}
 
 	/// Recursively executes nested sections, returns amounts
 	/// @notice for internal use purposes only
 	/// @dev should be called from 'executeRoute' function or from itself
-	function _executeSection(Part[] memory section, address[] memory tokens)
-		external
-		returns (uint256[] memory)
-	{
+	function _executeSection(
+		Part[] memory section,
+		address[] memory tokens,
+		uint256 skip
+	) external returns (uint256[] memory) {
 		uint256 sectionId = section[0].sectionId;
 		uint256[] memory amounts = new uint256[](section.length);
 		for (uint256 i; i < section.length; ) {
+			// if (skip & (1 << i) != 0) continue; // skip indicates all section to be skipped
+			if (skip & section[i].sectionId != 0) continue;
 			if (section[i].sectionId != sectionId) {
 				// steps to the end of the section
-				i = _executeNextSection(section, tokens, amounts, i);
+				i = _executeNextSection(section, tokens, amounts, skip, i);
 			} else {
 				_swapPart(section, tokens, amounts, i);
 				i++;
@@ -108,7 +130,7 @@ contract UroborusRouter {
 		address tokenOut = tokens[section[i].tokenOutId];
 		// if parts' amountIn not specified, use all avail. balance
 		// else if amountIn is greater than avail., transfer difference
-		if (amountIn.isZero()) {
+		if (amountIn == 0) {
 			amountIn = IERC20(tokenIn).selfBalance();
 		}
 		bytes memory data = abi.encodeWithSelector(
@@ -117,10 +139,10 @@ contract UroborusRouter {
 			amountIn,
 			section[i].data
 		);
-		bool ok;
+		bool success;
 		uint256 preBalance = IERC20(tokenOut).selfBalance();
-		(ok, ) = section[i].adaptor.delegatecall(data);
-		require(ok);
+		(success, ) = section[i].adaptor.delegatecall(data);
+		require(success);
 		uint256 postBalance = IERC20(tokenOut).selfBalance();
 		amounts[i] = postBalance.sub(preBalance);
 		if (amounts[i] < section[i].amountOutMin) {
@@ -134,13 +156,15 @@ contract UroborusRouter {
 		Part[] memory section,
 		address[] memory tokens,
 		uint256[] memory amounts,
+		uint256 skip,
 		uint256 i
 	) internal returns (uint256) {
 		Part[] memory nextSection = _getNextSection(section, i);
 		bytes memory data = abi.encodeWithSelector(
 			this._executeSection.selector,
 			nextSection,
-			tokens
+			tokens,
+			skip
 		);
 		bool success;
 		(success, data) = address(this).delegatecall(data);
@@ -166,4 +190,17 @@ contract UroborusRouter {
 		for (j = 0; j < nextLength; j++) nextSection[j] = section[i + j];
 		return nextSection;
 	}
+
+	// function _getRouteId(
+	// 	Part[] memory route,
+	// 	address[] memory tokens,
+	// 	uint256 skip
+	// ) internal pure returns (bytes32) {
+	// 	// +1 for out token
+	// 	uint256 length = route.length + 1;
+	// 	// goes through skip mask and subsracts skipped
+	// 	for (uint256 i; i < route.length; i++) if (skip & (1 << i) != 0) length--;
+	// 	address[] memory routeTokens = new address[](length);
+	// 	uint256 j;
+	// }
 }

@@ -1,7 +1,7 @@
 import { BigNumber, BigNumberish } from "@ethersproject/bignumber";
 import { ethers } from "hardhat";
 import { encodePacked, padLeft } from "web3-utils";
-import { ERC20PresetFixedSupply, UniswapV2Pair } from "../typechain-types";
+import { ERC20PresetFixedSupply, UniswapV2Pair, UroborusRouter } from "../typechain-types";
 
 export async function createUniswapV2Pair(
 	token0: ERC20PresetFixedSupply,
