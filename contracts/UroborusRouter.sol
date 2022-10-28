@@ -3,11 +3,13 @@ pragma solidity >=0.8.15;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
 import "./interfaces/IAdaptor.sol";
 import "./libraries/Hex.sol";
 import "./libraries/Math.sol";
 import "./libraries/SafeMath.sol";
 import "./libraries/UrbERC20.sol";
+
 import "hardhat/console.sol";
 
 /// @title Uroborus Router
@@ -41,6 +43,7 @@ contract UroborusRouter {
 		bytes data;
 	}
 
+	/// Executes route: first estimates route amounts, then executes successfully estimated sections
 	function executeRoute(Part[] memory route, address[] memory tokens)
 		external
 		payable
@@ -50,47 +53,45 @@ contract UroborusRouter {
 		return amounts;
 	}
 
+	/// Simulates route using adapter's ".quote" method. Costs much less gas because of read-only calls.
+	/// @return amounts estimated amounts
+	/// @return skip skip mask
 	function simulateRoute(Part[] memory route, address[] memory tokens)
 		internal
 		view
 		returns (uint256[] memory, uint256)
 	{
 		uint256[] memory amounts = new uint256[](route.length);
-		uint256[] memory balances = new uint256[](tokens.length);
+		// uint256[] memory balances = new uint256[](tokens.length);
 		uint256 skip;
 		for (uint256 i; i < route.length; i++) {
-			if (skip & route[i].sectionId != 0) continue;
-
+			if (skip & (1 << route[i].sectionId) != 0) continue;
 			uint256 amountIn = route[i].amountIn;
+			uint256 balance;
+			// for (uint256 j; j < i; j++) {
+			// 	if (route[j].tokenOutId == route[i].tokenInId) balance += amounts[j];
+			// 	else if (route[j].tokenInId == route[i].tokenInId) balance
+			// }
+			// uint256 balance = balances[route[i].tokenInId];
 			if (amountIn == 0) {
-				amountIn = balances[route[i].tokenInId];
-			} else if (amountIn > balances[route[i].tokenInId]) {
-				balances[route[i].tokenInId] = amountIn;
+				// amount not specified, uses all avail.
+				amountIn = balance;
 			}
-
-			// console.log(
-			// 	"%s.balance=%s",
-			// 	IERC20Metadata(tokens[route[i].tokenInId]).symbol(),
-			// 	balances[route[i].tokenInId]
-			// );
-
+			// else if (amountIn > balance) {
+			// 	// amount is greater then avail., "transfers" difference up to amount
+			// 	balances[route[i].tokenInId] = amountIn;
+			// }
 			amounts[i] = IAdaptor(route[i].adaptor).quote(
 				tokens[route[i].tokenInId],
 				amountIn,
 				route[i].data
 			);
-
-			if (amounts[i] < route[i].amountOutMin) skip |= route[i].sectionId;
-
-			balances[route[i].tokenInId] -= amountIn;
-			balances[route[i].tokenOutId] += amounts[i];
-
-			// console.log(
-			// 	"%s->%s",
-			// 	IERC20Metadata(tokens[route[i].tokenInId]).symbol(),
-			// 	IERC20Metadata(tokens[route[i].tokenOutId]).symbol()
-			// );
-			// console.log("%s->%s", amountIn, amounts[i]);
+			if (amounts[i] < route[i].amountOutMin) skip |= (1 << route[i].sectionId);
+			// wont't work because previos section might also change
+			// should cancel them or use another method
+			// or O(n^2)
+			// balances[route[i].tokenInId] -= amountIn;
+			// balances[route[i].tokenOutId] += amounts[i];
 		}
 		return (amounts, skip);
 	}
@@ -106,16 +107,31 @@ contract UroborusRouter {
 		uint256 sectionId = section[0].sectionId;
 		uint256[] memory amounts = new uint256[](section.length);
 		for (uint256 i; i < section.length; ) {
-			// if (skip & (1 << i) != 0) continue; // skip indicates all section to be skipped
-			if (skip & section[i].sectionId != 0) continue;
-			if (section[i].sectionId != sectionId) {
-				// steps to the end of the section
-				i = _executeNextSection(section, tokens, amounts, skip, i);
+			if (section[i].sectionId > sectionId) {
+				uint256 j;
+				for (; j < section.length; j++) if (section[j].sectionId <= sectionId) break;
+				uint256 nextLength = j - i;
+				Part[] memory nextSection = new Part[](nextLength);
+				for (uint256 k; k < nextLength; k++) nextSection[k] = section[i + k];
+				uint256[] memory nextAmounts = this._executeSection(nextSection, tokens, skip); // try
+				for (uint256 k; k < nextLength; k++) amounts[i + k] = nextAmounts[k];
+				i += nextLength;
 			} else {
-				_swapPart(section, tokens, amounts, i);
+				// swap here
 				i++;
 			}
 		}
+		// for (uint256 i; i < section.length; ) {
+		// 	if (skip & (1 << section[i].sectionId) != 0) continue;
+		// 	if (section[i].sectionId != sectionId) {
+		// 		// steps to the end of the section
+		// 		i = _executeNextSection(section, tokens, amounts, skip, i);
+		// 	} else {
+		// 		_swapPart(section, tokens, amounts, i);
+		// 		i++;
+		// 	}
+		// }
+
 		return amounts;
 	}
 
