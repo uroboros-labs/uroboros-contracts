@@ -16,6 +16,7 @@ let WETH: ERC20PresetFixedSupply,
 	wethUsdcPair15: UniswapV2Pair,
 	urbUsdcPair12: UniswapV2Pair,
 	btcWethPair17: UniswapV2Pair,
+	btcUsdcPair19: UniswapV2Pair,
 	uroborosRouter: UroborusRouter,
 	uniswapV2Adaptor: UniswapV2Adaptor;
 
@@ -60,12 +61,14 @@ async function init() {
 
 	uroborosRouter = await UroborosRouter.deploy(signer.address);
 
-	[wethUsdcPair14, wethUsdcPair15, urbUsdcPair12, btcWethPair17] = await Promise.all([
-		createUniswapV2Pair(WETH, USDC, "100000000000000000000", "400000000000000000000"),
-		createUniswapV2Pair(WETH, USDC, "100000000000000000000", "500000000000000000000"),
-		createUniswapV2Pair(URB, USDC, "100000000000000000000", "200000000000000000000"),
-		createUniswapV2Pair(BTC, WETH, "100000000000000000000", "700000000000000000000"),
-	]);
+	[wethUsdcPair14, wethUsdcPair15, urbUsdcPair12, btcWethPair17, btcUsdcPair19] =
+		await Promise.all([
+			createUniswapV2Pair(WETH, USDC, "100000000000000000000", "400000000000000000000"),
+			createUniswapV2Pair(WETH, USDC, "100000000000000000000", "500000000000000000000"),
+			createUniswapV2Pair(URB, USDC, "100000000000000000000", "200000000000000000000"),
+			createUniswapV2Pair(BTC, WETH, "100000000000000000000", "700000000000000000000"),
+			createUniswapV2Pair(BTC, USDC, "100000000000000000000", "900000000000000000000"),
+		]);
 
 	await WETH.approve(uroborosRouter.address, "1000000000000000000");
 }
@@ -112,10 +115,11 @@ describe("RouteExecutor", () => {
 				})!,
 			},
 		];
-		let amounts = await uroborosRouter.callStatic.executeRoute(route, tokens);
+		let [amounts, skip] = await uroborosRouter.callStatic.executeRoute(route, tokens);
 		console.log(amounts);
-		expect(amounts[0].toString()).eq("39872025157812017");
-		expect(amounts[1].toString()).eq("19870261882150628");
+		console.log(skip);
+		expect(amounts[0]).eq("39872025157812017");
+		expect(amounts[1]).eq("19870261882150628");
 	});
 
 	it("USDC->WETH->USDC, 41->15", async () => {
@@ -156,10 +160,11 @@ describe("RouteExecutor", () => {
 				})!,
 			},
 		];
-		let amounts = await uroborosRouter.callStatic.executeRoute(route, tokens);
+		let [amounts, skip] = await uroborosRouter.callStatic.executeRoute(route, tokens);
 		console.log(amounts);
-		expect(amounts[0].toString()).eq("248605413159054346");
-		expect(amounts[1].toString()).eq("1236110171506408603");
+		console.log(skip);
+		expect(amounts[0]).eq("248605413159054346");
+		expect(amounts[1]).eq("1236110171506408603");
 	});
 
 	it("WETH->USDC,URB->USDC", async () => {
@@ -201,10 +206,11 @@ describe("RouteExecutor", () => {
 			},
 		];
 
-		let amounts = await uroborosRouter.callStatic.executeRoute(route, tokens);
+		let [amounts, skip] = await uroborosRouter.callStatic.executeRoute(route, tokens);
 		console.log(amounts);
-		expect(amounts[0].toString()).eq("3948239995485009935");
-		expect(amounts[1].toString()).eq("1993780124005943");
+		console.log(skip);
+		expect(amounts[0]).eq("3948239995485009935");
+		expect(amounts[1]).eq("1993780124005943");
 	});
 
 	it("WETH->USDC->URB,USDC->WETH, fork - proper balance use", async () => {
@@ -262,11 +268,12 @@ describe("RouteExecutor", () => {
 			},
 		];
 
-		let amounts = await uroborosRouter.callStatic.executeRoute(route, tokens);
+		let [amounts, skip] = await uroborosRouter.callStatic.executeRoute(route, tokens);
 		console.log(amounts);
-		expect(amounts[0].toString()).eq("3948239995485009935"); // WETH(1) -> USDC(3.9) ~1/4
-		expect(amounts[1].toString()).eq("974411898691759675"); // USDC(1.9) -> URB(0.9) ~2/1
-		expect(amounts[2].toString()).eq("392056908979145419"); // USDC(1.9) -> WETH(0.39) ~1/5
+		console.log(skip);
+		expect(amounts[0]).eq("3948239995485009935"); // WETH(1) -> USDC(3.9) ~1/4
+		expect(amounts[1]).eq("974411898691759675"); // USDC(1.9) -> URB(0.9) ~2/1
+		expect(amounts[2]).eq("392056908979145419"); // USDC(1.9) -> WETH(0.39) ~1/5
 	});
 
 	// in that case two NFT's should be minted
@@ -309,9 +316,94 @@ describe("RouteExecutor", () => {
 			},
 		];
 
-		let amounts = await uroborosRouter.callStatic.executeRoute(route, tokens);
+		let [amounts, skip] = await uroborosRouter.callStatic.executeRoute(route, tokens);
 		console.log(amounts);
-		expect(amounts[0].toString()).eq("495977798662566437"); // ~2/1
-		expect(amounts[1].toString()).eq("142211755857978829"); // ~7/1
+		console.log(skip);
+		expect(amounts[0]).eq("495977798662566437"); // ~2/1
+		expect(amounts[1]).eq("142211755857978829"); // ~7/1
+	});
+
+	it("URB->(USDC->WETH->USDC)->BTC, cancelled cycle", async () => {
+		await initialized;
+
+		let tokens = [URB.address, USDC.address, WETH.address, BTC.address];
+		let route: UroborusRouter.PartStruct[] = [
+			{
+				amountIn: "1000000000000000000",
+				amountOutMin: 0,
+				sectionId: 0,
+				tokenInId: 0,
+				tokenOutId: 1,
+				adaptor: uniswapV2Adaptor.address,
+				data: encodeUniswapV2Swap({
+					pairAddress: urbUsdcPair12.address,
+					tokenIn: URB.address,
+					tokenOut: USDC.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+				})!,
+			},
+			{
+				// 1974119997742504967
+				amountIn: 0,
+				amountOutMin: 0,
+				sectionId: 1,
+				tokenInId: 1,
+				tokenOutId: 2,
+				adaptor: uniswapV2Adaptor.address,
+				data: encodeUniswapV2Swap({
+					pairAddress: wethUsdcPair14.address,
+					tokenIn: USDC.address,
+					tokenOut: WETH.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+				})!,
+			},
+			{
+				// 489591267126799483
+				amountIn: 0,
+				amountOutMin: "2428514733306148413",
+				sectionId: 1,
+				tokenInId: 2,
+				tokenOutId: 1,
+				adaptor: uniswapV2Adaptor.address,
+				data: encodeUniswapV2Swap({
+					pairAddress: wethUsdcPair15.address,
+					tokenIn: WETH.address,
+					tokenOut: USDC.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+				})!,
+			},
+			{
+				// 2428514733306148412
+				amountIn: 0,
+				amountOutMin: 0, // 241680061406581968
+				sectionId: 0,
+				tokenInId: 1,
+				tokenOutId: 3,
+				adaptor: uniswapV2Adaptor.address,
+				data: encodeUniswapV2Swap({
+					pairAddress: btcUsdcPair19.address,
+					tokenIn: USDC.address,
+					tokenOut: BTC.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+				})!,
+			},
+		];
+
+		let [amounts, skip] = await uroborosRouter.callStatic.executeRoute(route, tokens);
+		console.log(amounts);
+		console.log(skip);
+		expect(skip).eq(2); // section 1 skipped
+		expect(amounts[0]).eq("1974119997742504967");
+		expect(amounts[1]).eq("489591267126799483");
+		expect(amounts[2]).eq("2428514733306148412"); // <amountOutMin
+		expect(amounts[3]).eq("218189583805294788"); // 1974119997742504967->.. ~9/1
 	});
 });

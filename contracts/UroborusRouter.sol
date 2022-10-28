@@ -20,12 +20,6 @@ contract UroborusRouter {
 	using Math for uint256;
 	using SafeMath for uint256;
 
-	/// @param routeId hash of route's token list that are swapped
-	/// @param amounts list of amounts of tokens that are swapped
-	/// @notice Route payload is not included to event,
-	/// because it can be restored by locating transaction and parsing calldata
-	event RouteExecuted(bytes32 indexed routeId, uint256[] amounts);
-
 	/// @dev used to compute adaptorAddress: keccak256(rlp([adaptorDeployer, adaptorId]))[12:]
 	address public immutable adaptorDeployer;
 
@@ -36,7 +30,7 @@ contract UroborusRouter {
 	struct Part {
 		uint256 amountIn;
 		uint256 amountOutMin;
-		uint256 sectionId; // if it's single bit unique integer, can be used in skip mask
+		uint256 sectionId;
 		uint256 tokenInId;
 		uint256 tokenOutId;
 		address adaptor;
@@ -47,10 +41,10 @@ contract UroborusRouter {
 	function executeRoute(Part[] memory route, address[] memory tokens)
 		external
 		payable
-		returns (uint256[] memory)
+		returns (uint256[] memory, uint256)
 	{
-		(uint256[] memory amounts, ) = simulateRoute(route, tokens);
-		return amounts;
+		(uint256[] memory amounts, uint256 skip) = simulateRoute(route, tokens);
+		return (amounts, skip);
 	}
 
 	/// Simulates route using adapter's ".quote" method. Costs much less gas because of read-only calls.
@@ -67,29 +61,37 @@ contract UroborusRouter {
 		for (uint256 i; i < route.length; i++) {
 			if (skip & (1 << route[i].sectionId) != 0) continue;
 			uint256 amountIn = route[i].amountIn;
-			uint256 balance;
-			// for (uint256 j; j < i; j++) {
-			// 	if (route[j].tokenOutId == route[i].tokenInId) balance += amounts[j];
-			// 	else if (route[j].tokenInId == route[i].tokenInId) balance
-			// }
 			// uint256 balance = balances[route[i].tokenInId];
-			if (amountIn == 0) {
-				// amount not specified, uses all avail.
-				amountIn = balance;
-			}
-			// else if (amountIn > balance) {
-			// 	// amount is greater then avail., "transfers" difference up to amount
+			// if (amountIn == 0) {
+			// 	amountIn = balance;
+			// } else if (amountIn > balance) {
 			// 	balances[route[i].tokenInId] = amountIn;
 			// }
+			// if amountIn=0, find balance
+			if (amountIn == 0)
+				for (uint256 j; j < i; j++) {
+					if (skip & (1 << route[j].sectionId) != 0) continue;
+					if (route[j].tokenOutId == route[i].tokenInId) amountIn += amounts[j];
+					else if (route[j].tokenInId == route[i].tokenInId) {
+						if (route[j].amountIn == 0) amountIn -= amounts[j - 1];
+						else amountIn -= route[j].amountIn;
+					}
+				}
+			console.log(
+				"tokenIn: %s, amountIn: %s",
+				IERC20Metadata(tokens[route[i].tokenInId]).symbol(),
+				amountIn
+			);
 			amounts[i] = IAdaptor(route[i].adaptor).quote(
 				tokens[route[i].tokenInId],
 				amountIn,
 				route[i].data
 			);
-			if (amounts[i] < route[i].amountOutMin) skip |= (1 << route[i].sectionId);
-			// wont't work because previos section might also change
-			// should cancel them or use another method
-			// or O(n^2)
+			if (amounts[i] < route[i].amountOutMin) {
+				skip |= (1 << route[i].sectionId);
+				continue;
+			}
+			// if we are at the end of cycle, we previously substracted amountIn and didn't restored it
 			// balances[route[i].tokenInId] -= amountIn;
 			// balances[route[i].tokenOutId] += amounts[i];
 		}
