@@ -17,7 +17,7 @@ let WETH: ERC20PresetFixedSupply,
 	urbUsdcPair12: UniswapV2Pair,
 	btcWethPair17: UniswapV2Pair,
 	btcUsdcPair19: UniswapV2Pair,
-	uroborosRouter: UroborusRouter,
+	urbRouter: UroborusRouter,
 	uniswapV2Adaptor: UniswapV2Adaptor;
 
 async function init() {
@@ -59,7 +59,7 @@ async function init() {
 		),
 	]);
 
-	uroborosRouter = await UroborosRouter.deploy(signer.address);
+	urbRouter = await UroborosRouter.deploy(signer.address);
 
 	[wethUsdcPair14, wethUsdcPair15, urbUsdcPair12, btcWethPair17, btcUsdcPair19] =
 		await Promise.all([
@@ -70,7 +70,7 @@ async function init() {
 			createUniswapV2Pair(BTC, USDC, "100000000000000000000", "900000000000000000000"),
 		]);
 
-	await WETH.approve(uroborosRouter.address, "1000000000000000000");
+	await WETH.approve(urbRouter.address, "1000000000000000000");
 }
 
 describe("RouteExecutor", () => {
@@ -115,7 +115,7 @@ describe("RouteExecutor", () => {
 				})!,
 			},
 		];
-		let [amounts, skip] = await uroborosRouter.callStatic.executeRoute(route, tokens);
+		let [amounts, skip] = await urbRouter.callStatic.executeRoute(route, tokens);
 		console.log(amounts);
 		console.log(skip);
 		expect(amounts[0]).eq("39872025157812017");
@@ -160,7 +160,7 @@ describe("RouteExecutor", () => {
 				})!,
 			},
 		];
-		let [amounts, skip] = await uroborosRouter.callStatic.executeRoute(route, tokens);
+		let [amounts, skip] = await urbRouter.callStatic.executeRoute(route, tokens);
 		console.log(amounts);
 		console.log(skip);
 		expect(amounts[0]).eq("248605413159054346");
@@ -206,7 +206,7 @@ describe("RouteExecutor", () => {
 			},
 		];
 
-		let [amounts, skip] = await uroborosRouter.callStatic.executeRoute(route, tokens);
+		let [amounts, skip] = await urbRouter.callStatic.executeRoute(route, tokens);
 		console.log(amounts);
 		console.log(skip);
 		expect(amounts[0]).eq("3948239995485009935");
@@ -268,7 +268,7 @@ describe("RouteExecutor", () => {
 			},
 		];
 
-		let [amounts, skip] = await uroborosRouter.callStatic.executeRoute(route, tokens);
+		let [amounts, skip] = await urbRouter.callStatic.executeRoute(route, tokens);
 		console.log(amounts);
 		console.log(skip);
 		expect(amounts[0]).eq("3948239995485009935"); // WETH(1) -> USDC(3.9) ~1/4
@@ -316,7 +316,7 @@ describe("RouteExecutor", () => {
 			},
 		];
 
-		let [amounts, skip] = await uroborosRouter.callStatic.executeRoute(route, tokens);
+		let [amounts, skip] = await urbRouter.callStatic.executeRoute(route, tokens);
 		console.log(amounts);
 		console.log(skip);
 		expect(amounts[0]).eq("495977798662566437"); // ~2/1
@@ -397,7 +397,7 @@ describe("RouteExecutor", () => {
 			},
 		];
 
-		let [amounts, skip] = await uroborosRouter.callStatic.executeRoute(route, tokens);
+		let [amounts, skip] = await urbRouter.callStatic.executeRoute(route, tokens);
 		console.log(amounts);
 		console.log(skip);
 		expect(skip).eq(2); // section 1 skipped
