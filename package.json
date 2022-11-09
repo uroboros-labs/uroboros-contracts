@@ -14,9 +14,13 @@
 		"@nomicfoundation/hardhat-toolbox": "^2.0.0",
 		"@nomiclabs/hardhat-solhint": "^2.0.1",
 		"@openzeppelin/contracts": "^4.7.3",
+		"@types/web3-eth-abi": "^1.2.2",
 		"hardhat": "^2.12.0",
 		"hardhat-docgen": "^1.3.0",
 		"solidity-docgen": "^0.6.0-beta.29",
 		"web3-utils": "^1.8.0"
+	},
+	"dependencies": {
+		"web3-eth-abi": "^1.8.0"
 	}
 }

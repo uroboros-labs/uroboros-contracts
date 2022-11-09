@@ -5,6 +5,7 @@ import "./interfaces/IAdaptor.sol";
 import "./libraries/UrbERC20.sol";
 import "./libraries/RevertReasonParser.sol";
 import "./libraries/Part.sol";
+import "./libraries/Bitmap.sol";
 
 /// @title Uroborus Router
 /// @author maksfourlife
@@ -12,6 +13,7 @@ contract UroborusRouter {
 	using Part for uint256;
 	using UrbDeployer for address;
 	using UrbERC20 for IERC20;
+	using BitMap for uint256;
 
 	struct SwapParams {
 		address deployer;
@@ -21,35 +23,46 @@ contract UroborusRouter {
 		bytes data;
 	}
 
-	function swap(SwapParams calldata params) external payable returns (uint256[] memory amounts) {
+	function swap(SwapParams calldata params)
+		external
+		payable
+		returns (uint256[] memory amounts, uint256 skipMask)
+	{
 		amounts = new uint256[](params.parts.length);
-		uint256 skipMask;
-		for (uint256 i; i < params.parts.length; i++) {
-			if (skipMask & (1 << params.parts[i].sectionId()) != 0) {
+		uint256[] memory cumulative = new uint256[](params.parts.length);
+		for (uint256 i; i < params.parts.length; ) {
+			if (skipMask.get(params.parts[i].sectionId())) {
 				continue;
 			}
+			// why wouldn't we just use cumulative amounts?
 			address adaptor = params.parts[i].getAdaptor(params.deployer);
 			uint256 idx = params.parts[i].tokenInIdx();
 			address tokenIn = params.tokens[idx];
 			uint256 amountIn = getAmountIn(params, amounts, i);
 			bytes memory data = params.data[params.parts[i].dataStart():params.parts[i].dataEnd()];
-			amounts[i] = IAdaptor(adaptor).quote(tokenIn, amountIn, data);
+			uint256 amountOut = IAdaptor(adaptor).quote(tokenIn, amountIn, data);
 			idx = params.parts[i].amountOutMinIdx();
-			if (idx < params.amounts.length && amounts[i] < params.amounts[idx]) {
-				skipMask |= 1 << params.parts[i].sectionId();
+			if (idx < params.amounts.length && amountOut < params.amounts[idx]) {
+				skipMask = skipMask.set(params.parts[i].sectionId());
+				i = params.parts[i].sectionEnd();
+			} else {
+				amounts[i] = amountOut;
+				cumulative[i] = amountOut;
+				for (uint256 j; j < i; j++) {}
+				i++;
 			}
 		}
-		this.internalSwap(params, skipMask, 0);
+		this.swap(params, skipMask, 0x0);
 	}
 
-	function internalSwap(
+	function swap(
 		SwapParams calldata params,
 		uint256 skipMask,
 		uint256 depth
 	) external returns (uint256[] memory) {
 		uint256[] memory amounts = new uint256[](params.parts.length);
 		for (uint256 i; i < params.parts.length; ) {
-			if (skipMask & (1 << params.parts[i].sectionId()) != 0) {
+			if (skipMask.get(params.parts[i].sectionId())) {
 				continue;
 			}
 			if (params.parts[i].sectionDepth() > depth) {
@@ -61,7 +74,7 @@ contract UroborusRouter {
 					params.tokens,
 					params.data
 				);
-				try this.internalSwap(sectionParams, skipMask, depth + 1) returns (
+				try this.swap(sectionParams, skipMask, depth + 0x1) returns (
 					uint256[] memory sectionAmounts
 				) {
 					for (uint256 j; j < sectionAmounts.length; j++) {
@@ -103,8 +116,8 @@ contract UroborusRouter {
 		uint256 idx = params.parts[partIdx].amountInIdx();
 		if (idx <= params.amounts.length) {
 			return params.amounts[idx];
-		} else if (partIdx > 0) {
-			return amounts[partIdx - 1];
+		} else if (partIdx > 0x0) {
+			return amounts[partIdx - 0x1];
 		} else {
 			revert("UrbRouter: amount not provided");
 		}

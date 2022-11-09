@@ -1,0 +1,12 @@
+[
+	{
+		"route": [
+			{
+				"amount_in": "0x1000",
+				"token_in": "0x1",
+				"token_out": "0x2"
+			}
+		],
+		"amounts": []
+	}
+]

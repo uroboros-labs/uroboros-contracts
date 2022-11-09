@@ -20,65 +20,61 @@ let WETH: ERC20PresetFixedSupply,
 	urbRouter: UroborusRouter,
 	uniswapV2Adaptor: UniswapV2Adaptor;
 
-async function init() {
-	let [signer] = await ethers.getSigners();
+describe("RouteExecutor", () => {
+	beforeEach(async () => {
+		let [signer] = await ethers.getSigners();
 
-	let [ERC20PresetFixedSupply, UniswapV2Adaptor, UroborosRouter] = await Promise.all([
-		ethers.getContractFactory("ERC20PresetFixedSupply"),
-		ethers.getContractFactory("UniswapV2Adaptor"),
-		ethers.getContractFactory("UroborusRouter"),
-	]);
-
-	uniswapV2Adaptor = await UniswapV2Adaptor.deploy();
-
-	[WETH, USDC, URB, BTC] = await Promise.all([
-		ERC20PresetFixedSupply.deploy(
-			"Wrapped Ether",
-			"WETH",
-			"100000000000000000000000",
-			signer.address
-		),
-		ERC20PresetFixedSupply.deploy(
-			//
-			"USDC",
-			"USDC",
-			"100000000000000000000000",
-			signer.address
-		),
-		ERC20PresetFixedSupply.deploy(
-			"Uroboros",
-			"URB",
-			"100000000000000000000000",
-			signer.address
-		),
-		ERC20PresetFixedSupply.deploy(
-			"Pegged Bitcoin",
-			"BTC",
-			"100000000000000000000000",
-			signer.address
-		),
-	]);
-
-	urbRouter = await UroborosRouter.deploy(signer.address);
-
-	[wethUsdcPair14, wethUsdcPair15, urbUsdcPair12, btcWethPair17, btcUsdcPair19] =
-		await Promise.all([
-			createUniswapV2Pair(WETH, USDC, "100000000000000000000", "400000000000000000000"),
-			createUniswapV2Pair(WETH, USDC, "100000000000000000000", "500000000000000000000"),
-			createUniswapV2Pair(URB, USDC, "100000000000000000000", "200000000000000000000"),
-			createUniswapV2Pair(BTC, WETH, "100000000000000000000", "700000000000000000000"),
-			createUniswapV2Pair(BTC, USDC, "100000000000000000000", "900000000000000000000"),
+		let [ERC20PresetFixedSupply, UniswapV2Adaptor, UroborosRouter] = await Promise.all([
+			ethers.getContractFactory("ERC20PresetFixedSupply"),
+			ethers.getContractFactory("UniswapV2Adaptor"),
+			ethers.getContractFactory("UroborusRouter"),
 		]);
 
-	await WETH.approve(urbRouter.address, "1000000000000000000");
-}
+		uniswapV2Adaptor = await UniswapV2Adaptor.deploy();
 
-describe("RouteExecutor", () => {
-	let initialized = init();
+		[WETH, USDC, URB, BTC] = await Promise.all([
+			ERC20PresetFixedSupply.deploy(
+				"Wrapped Ether",
+				"WETH",
+				"100000000000000000000000",
+				signer.address
+			),
+			ERC20PresetFixedSupply.deploy(
+				//
+				"USDC",
+				"USDC",
+				"100000000000000000000000",
+				signer.address
+			),
+			ERC20PresetFixedSupply.deploy(
+				"Uroboros",
+				"URB",
+				"100000000000000000000000",
+				signer.address
+			),
+			ERC20PresetFixedSupply.deploy(
+				"Pegged Bitcoin",
+				"BTC",
+				"100000000000000000000000",
+				signer.address
+			),
+		]);
+
+		urbRouter = await UroborosRouter.deploy(signer.address);
+
+		[wethUsdcPair14, wethUsdcPair15, urbUsdcPair12, btcWethPair17, btcUsdcPair19] =
+			await Promise.all([
+				createUniswapV2Pair(WETH, USDC, "100000000000000000000", "400000000000000000000"),
+				createUniswapV2Pair(WETH, USDC, "100000000000000000000", "500000000000000000000"),
+				createUniswapV2Pair(URB, USDC, "100000000000000000000", "200000000000000000000"),
+				createUniswapV2Pair(BTC, WETH, "100000000000000000000", "700000000000000000000"),
+				createUniswapV2Pair(BTC, USDC, "100000000000000000000", "900000000000000000000"),
+			]);
+
+		await WETH.approve(urbRouter.address, "1000000000000000000");
+	});
 
 	it("WETH -> USDC -> URB", async () => {
-		await initialized;
-
 		let tokens: string[] = [WETH.address, USDC.address, URB.address];
 
 		let route: UroborusRouter.PartStruct[] = [
@@ -123,8 +119,6 @@ describe("RouteExecutor", () => {
 	});
 
 	it("USDC->WETH->USDC, 41->15", async () => {
-		await initialized;
-
 		let tokens = [USDC.address, WETH.address];
 		let route: UroborusRouter.PartStruct[] = [
 			{
@@ -168,8 +162,6 @@ describe("RouteExecutor", () => {
 	});
 
 	it("WETH->USDC,URB->USDC", async () => {
-		await initialized;
-
 		let tokens = [WETH.address, URB.address, USDC.address];
 		let route: UroborusRouter.PartStruct[] = [
 			{
@@ -214,8 +206,6 @@ describe("RouteExecutor", () => {
 	});
 
 	it("WETH->USDC->URB,USDC->WETH, fork - proper balance use", async () => {
-		await initialized;
-
 		let tokens = [WETH.address, USDC.address, URB.address];
 		let route: UroborusRouter.PartStruct[] = [
 			{
@@ -278,8 +268,6 @@ describe("RouteExecutor", () => {
 
 	// in that case two NFT's should be minted
 	it("USDC->URB,WETH->BTC, two independent routes", async () => {
-		await initialized;
-
 		let tokens = [USDC.address, URB.address, WETH.address, BTC.address];
 		let route: UroborusRouter.PartStruct[] = [
 			{
@@ -324,8 +312,6 @@ describe("RouteExecutor", () => {
 	});
 
 	it("URB->(USDC->WETH->USDC)->BTC, cancelled cycle", async () => {
-		await initialized;
-
 		let tokens = [URB.address, USDC.address, WETH.address, BTC.address];
 		let route: UroborusRouter.PartStruct[] = [
 			{
