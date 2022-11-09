@@ -15,6 +15,10 @@ contract UroborusRouter {
 	using UrbERC20 for IERC20;
 	using BitMap for uint256;
 
+	event Error(string reason);
+	/// @notice THIS IS DEV-ONLY, remove this in production
+	event Section(uint256 start, uint256 end, uint256 depth);
+
 	struct SwapParams {
 		address deployer;
 		uint256[] parts;
@@ -28,13 +32,20 @@ contract UroborusRouter {
 		payable
 		returns (uint256[] memory amounts, uint256 skipMask)
 	{
+		(amounts, skipMask) = simulateSwap(params);
+		this.swap(params, amounts, skipMask, 0x0, params.parts.length, 0x0);
+	}
+
+	function simulateSwap(SwapParams calldata params)
+		internal
+		view
+		returns (uint256[] memory amounts, uint256 skipMask)
+	{
 		amounts = new uint256[](params.parts.length);
-		uint256[] memory cumulative = new uint256[](params.parts.length);
 		for (uint256 i; i < params.parts.length; ) {
 			if (skipMask.get(params.parts[i].sectionId())) {
 				continue;
 			}
-			// why wouldn't we just use cumulative amounts?
 			address adaptor = params.parts[i].getAdaptor(params.deployer);
 			uint256 idx = params.parts[i].tokenInIdx();
 			address tokenIn = params.tokens[idx];
@@ -46,66 +57,65 @@ contract UroborusRouter {
 				skipMask = skipMask.set(params.parts[i].sectionId());
 				i = params.parts[i].sectionEnd();
 			} else {
-				amounts[i] = amountOut;
-				cumulative[i] = amountOut;
-				for (uint256 j; j < i; j++) {}
 				i++;
 			}
 		}
-		this.swap(params, skipMask, 0x0);
 	}
 
 	function swap(
 		SwapParams calldata params,
+		uint256[] memory amounts,
 		uint256 skipMask,
+		uint256 start,
+		uint256 end,
 		uint256 depth
 	) external returns (uint256[] memory) {
-		uint256[] memory amounts = new uint256[](params.parts.length);
-		for (uint256 i; i < params.parts.length; ) {
+		emit Section(start, end, depth);
+		for (uint256 i = start; i < end; ) {
 			if (skipMask.get(params.parts[i].sectionId())) {
 				continue;
 			}
 			if (params.parts[i].sectionDepth() > depth) {
 				uint256 sectionEnd = params.parts[i].sectionEnd();
-				SwapParams memory sectionParams = SwapParams(
-					params.deployer,
-					params.parts[i:sectionEnd],
-					params.amounts,
-					params.tokens,
-					params.data
-				);
-				try this.swap(sectionParams, skipMask, depth + 0x1) returns (
-					uint256[] memory sectionAmounts
+				try this.swap(params, amounts, skipMask, i, sectionEnd, depth + 0x1) returns (
+					uint256[] memory newAmounts
 				) {
-					for (uint256 j; j < sectionAmounts.length; j++) {
-						amounts[i + j] = sectionAmounts[j];
-					}
-				} catch {}
+					amounts = newAmounts;
+				} catch Error(string memory reason) {
+					emit Error(reason);
+				}
 				i = sectionEnd;
 			} else {
-				address tokenIn = params.tokens[params.parts[i].tokenInIdx()];
-				uint256 amountIn = getAmountIn(params, amounts, i);
-				bytes memory data = abi.encodeWithSelector(
-					IAdaptor.swap.selector,
-					tokenIn,
-					amountIn,
-					params.data[params.parts[i].dataStart():params.parts[i].dataEnd()]
-				);
-				address tokenOut = params.tokens[params.parts[i].tokenOutIdx()];
-				uint256 preBalance = IERC20(tokenOut).selfBalance();
-				bool success;
-				(success, data) = params.parts[i].getAdaptor(params.deployer).delegatecall(data);
-				require(success, RevertReasonParser.parse(data));
-				uint256 postBalance = IERC20(tokenOut).selfBalance();
-				uint256 idx = params.parts[i].amountOutMinIdx();
-				require(
-					idx > params.amounts.length || preBalance + params.amounts[idx] >= postBalance,
-					"UrbRouter: insufficient amount"
-				);
-				i++;
+				swapPart(params, amounts, i++);
 			}
 		}
 		return amounts;
+	}
+
+	function swapPart(
+		SwapParams calldata params,
+		uint256[] memory amounts,
+		uint256 i
+	) internal {
+		address tokenIn = params.tokens[params.parts[i].tokenInIdx()];
+		uint256 amountIn = getAmountIn(params, amounts, i);
+		bytes memory data = abi.encodeWithSelector(
+			IAdaptor.swap.selector,
+			tokenIn,
+			amountIn,
+			params.data[params.parts[i].dataStart():params.parts[i].dataEnd()]
+		);
+		address tokenOut = params.tokens[params.parts[i].tokenOutIdx()];
+		uint256 preBalance = IERC20(tokenOut).selfBalance();
+		bool success;
+		(success, data) = params.parts[i].getAdaptor(params.deployer).delegatecall(data);
+		require(success, RevertReasonParser.parse(data));
+		uint256 postBalance = IERC20(tokenOut).selfBalance();
+		uint256 idx = params.parts[i].amountOutMinIdx();
+		require(
+			idx > params.amounts.length || preBalance + params.amounts[idx] >= postBalance,
+			"UrbRouter: insufficient amount"
+		);
 	}
 
 	function getAmountIn(
@@ -114,7 +124,7 @@ contract UroborusRouter {
 		uint256 partIdx
 	) internal pure returns (uint256) {
 		uint256 idx = params.parts[partIdx].amountInIdx();
-		if (idx <= params.amounts.length) {
+		if (idx < params.amounts.length) {
 			return params.amounts[idx];
 		} else if (partIdx > 0x0) {
 			return amounts[partIdx - 0x1];
