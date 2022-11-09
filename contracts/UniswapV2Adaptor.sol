@@ -43,7 +43,7 @@ contract UniswapV2Adaptor is IAdaptor {
 		uint256 amountIn,
 		bytes memory data
 	) internal view returns (uint256) {
-		(uint112 reserveIn, uint112 reserveOut, ) = IUniswapV2Pair(addr).getReserves();
+		(uint112 reserveOut, uint112 reserveIn, ) = IUniswapV2Pair(addr).getReserves();
 		if (data.zeroForOne()) {
 			(reserveIn, reserveOut) = (reserveOut, reserveIn);
 		}

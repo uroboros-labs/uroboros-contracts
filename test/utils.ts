@@ -1,7 +1,7 @@
 import { BigNumber, BigNumberish } from "@ethersproject/bignumber"
 import { ethers } from "hardhat"
 import { encodePacked, padLeft } from "web3-utils"
-import { ERC20PresetFixedSupply, UniswapV2Pair, UroborusRouter } from "../typechain-types"
+import { ERC20PresetFixedSupply, UniswapV2Pair } from "../typechain-types"
 
 export async function createUniswapV2Pair(
 	token0: ERC20PresetFixedSupply,
@@ -57,28 +57,6 @@ export type SwapPart = {
 }
 
 export function encodeSwapPart(pt: SwapPart): string {
-	// amountInIdx
-	// amountOutMinIdx
-	// tokenInIdx
-	// tokenOutIdx
-	// adaptorId
-	// dataStart
-	// dataEnd
-	// sectionId
-	// sectionDepth
-	// sectionEnd
-	// console.log([
-	// 	padLeft(pt.sectionEnd, 2),
-	// 	padLeft(pt.sectionDepth, 2),
-	// 	padLeft(pt.sectionId, 2),
-	// 	padLeft(pt.dataEnd, 4),
-	// 	padLeft(pt.dataStart, 4),
-	// 	padLeft(pt.adaptorId, 2),
-	// 	padLeft(pt.tokenOutIdx, 2),
-	// 	padLeft(pt.tokenInIdx, 2),
-	// 	padLeft(pt.amountOutMinIdx, 2),
-	// 	padLeft(pt.amountInIdx, 2),
-	// ])
 	return padLeft(
 		encodePacked(
 			padLeft(pt.sectionEnd, 2),
@@ -159,6 +137,11 @@ export function encodeUniswapV2SwapData(data: UniswapV2SwapData): string {
 		padLeft(data.buyFee, 4),
 		data.zeroForOne ? "0x01" : "0x00"
 	)!
+}
+
+export function getZeroForOne(tokenIn: BigNumberish, tokenOut: BigNumberish): boolean {
+	console.log(tokenIn, tokenOut)
+	return BigNumber.from(tokenIn).lt(tokenOut)
 }
 
 export function encodeAdaptorIdAndSwapData(swapData: SwapData): AdaptorIdAndSwapData {

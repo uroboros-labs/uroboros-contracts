@@ -6,7 +6,7 @@ import {
 	UniswapV2Pair,
 	UroborusRouter,
 } from "../typechain-types"
-import { createUniswapV2Pair, encodeRoute, encodeUniswapV2Swap } from "./utils"
+import { createUniswapV2Pair, encodeRoute, encodeUniswapV2Swap, getZeroForOne } from "./utils"
 
 let deployer: string,
 	WETH: ERC20PresetFixedSupply,
@@ -80,42 +80,6 @@ describe("RouteExecutor", () => {
 	})
 
 	it("WETH -> USDC -> URB", async () => {
-		// let tokens: string[] = [WETH.address, USDC.address, URB.address]
-
-		// let route: UroborusRouter.PartStruct[] = [
-		// 	{
-		// 		amountIn: "10000000000000000",
-		// 		amountOutMin: 0,
-		// 		sectionId: 0,
-		// 		tokenInId: 0,
-		// 		tokenOutId: 1,
-		// 		adaptor: uniswapV2Adaptor.address,
-		// 		data: encodeUniswapV2Swap({
-		// 			pairAddress: wethUsdcPair14.address,
-		// 			tokenIn: WETH.address,
-		// 			tokenOut: USDC.address,
-		// 			swapFee: 30,
-		// 			sellFee: 0,
-		// 			buyFee: 0,
-		// 		})!,
-		// 	},
-		// 	{
-		// 		amountIn: 0,
-		// 		amountOutMin: 0,
-		// 		sectionId: 0,
-		// 		tokenInId: 1,
-		// 		tokenOutId: 2,
-		// 		adaptor: uniswapV2Adaptor.address,
-		// 		data: encodeUniswapV2Swap({
-		// 			pairAddress: urbUsdcPair12.address,
-		// 			tokenIn: USDC.address,
-		// 			tokenOut: URB.address,
-		// 			swapFee: 30,
-		// 			sellFee: 0,
-		// 			buyFee: 0,
-		// 		})!,
-		// 	},
-		// ]
 		let route = encodeRoute([
 			{
 				amountIn: "10000000000000000",
@@ -127,7 +91,7 @@ describe("RouteExecutor", () => {
 					swapFee: 30,
 					sellFee: 0,
 					buyFee: 0,
-					zeroForOne: (await wethUsdcPair14.token0()) === WETH.address, // todo
+					zeroForOne: getZeroForOne(WETH.address, USDC.address),
 				},
 				sectionId: 0,
 				sectionDepth: 0,
@@ -142,7 +106,7 @@ describe("RouteExecutor", () => {
 					swapFee: 30,
 					sellFee: 0,
 					buyFee: 0,
-					zeroForOne: (await urbUsdcPair12.token0()) === USDC.address,
+					zeroForOne: getZeroForOne(USDC.address, URB.address),
 				},
 				sectionId: 0,
 				sectionDepth: 0,
