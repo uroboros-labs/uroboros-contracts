@@ -7,6 +7,8 @@ import "./libraries/RevertReasonParser.sol";
 import "./libraries/Part.sol";
 import "./libraries/Bitmap.sol";
 
+import "hardhat/console.sol";
+
 /// @title Uroborus Router
 /// @author maksfourlife
 contract UroborusRouter {
@@ -33,7 +35,7 @@ contract UroborusRouter {
 		returns (uint256[] memory amounts, uint256 skipMask)
 	{
 		(amounts, skipMask) = simulateSwap(params);
-		this.swap(params, amounts, skipMask, 0x0, params.parts.length, 0x0);
+		// this.swapSection(params, amounts, skipMask, 0x0, params.parts.length, 0x0);
 	}
 
 	function simulateSwap(SwapParams calldata params)
@@ -50,10 +52,12 @@ contract UroborusRouter {
 			uint256 idx = params.parts[i].tokenInIdx();
 			address tokenIn = params.tokens[idx];
 			uint256 amountIn = getAmountIn(params, amounts, i);
+			console.log("amountIn: %s", amountIn);
 			bytes memory data = params.data[params.parts[i].dataStart():params.parts[i].dataEnd()];
-			uint256 amountOut = IAdaptor(adaptor).quote(tokenIn, amountIn, data);
+			console.log("adaptor: %s", adaptor);
+			amounts[i] = IAdaptor(adaptor).quote(tokenIn, amountIn, data);
 			idx = params.parts[i].amountOutMinIdx();
-			if (idx < params.amounts.length && amountOut < params.amounts[idx]) {
+			if (idx < params.amounts.length && amounts[i] < params.amounts[idx]) {
 				skipMask = skipMask.set(params.parts[i].sectionId());
 				i = params.parts[i].sectionEnd();
 			} else {
@@ -62,7 +66,7 @@ contract UroborusRouter {
 		}
 	}
 
-	function swap(
+	function swapSection(
 		SwapParams calldata params,
 		uint256[] memory amounts,
 		uint256 skipMask,
@@ -77,9 +81,9 @@ contract UroborusRouter {
 			}
 			if (params.parts[i].sectionDepth() > depth) {
 				uint256 sectionEnd = params.parts[i].sectionEnd();
-				try this.swap(params, amounts, skipMask, i, sectionEnd, depth + 0x1) returns (
-					uint256[] memory newAmounts
-				) {
+				try
+					this.swapSection(params, amounts, skipMask, i, sectionEnd, depth + 0x1)
+				returns (uint256[] memory newAmounts) {
 					amounts = newAmounts;
 				} catch Error(string memory reason) {
 					emit Error(reason);
@@ -122,7 +126,7 @@ contract UroborusRouter {
 		SwapParams calldata params,
 		uint256[] memory amounts,
 		uint256 partIdx
-	) internal pure returns (uint256) {
+	) internal view returns (uint256) {
 		uint256 idx = params.parts[partIdx].amountInIdx();
 		if (idx < params.amounts.length) {
 			return params.amounts[idx];

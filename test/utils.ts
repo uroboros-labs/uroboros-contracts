@@ -57,18 +57,43 @@ export type SwapPart = {
 }
 
 export function encodeSwapPart(pt: SwapPart): string {
-	return encodePacked(
-		padLeft(pt.amountInIdx, 2),
-		padLeft(pt.amountOutMinIdx, 2),
-		padLeft(pt.tokenInIdx, 2),
-		padLeft(pt.tokenOutIdx, 2),
-		padLeft(pt.adaptorId, 2),
-		padLeft(pt.dataStart, 4),
-		padLeft(pt.dataEnd, 4),
-		padLeft(pt.sectionId, 2),
-		padLeft(pt.sectionDepth, 2),
-		padLeft(pt.sectionEnd, 2)
-	)!
+	// amountInIdx
+	// amountOutMinIdx
+	// tokenInIdx
+	// tokenOutIdx
+	// adaptorId
+	// dataStart
+	// dataEnd
+	// sectionId
+	// sectionDepth
+	// sectionEnd
+	// console.log([
+	// 	padLeft(pt.sectionEnd, 2),
+	// 	padLeft(pt.sectionDepth, 2),
+	// 	padLeft(pt.sectionId, 2),
+	// 	padLeft(pt.dataEnd, 4),
+	// 	padLeft(pt.dataStart, 4),
+	// 	padLeft(pt.adaptorId, 2),
+	// 	padLeft(pt.tokenOutIdx, 2),
+	// 	padLeft(pt.tokenInIdx, 2),
+	// 	padLeft(pt.amountOutMinIdx, 2),
+	// 	padLeft(pt.amountInIdx, 2),
+	// ])
+	return padLeft(
+		encodePacked(
+			padLeft(pt.sectionEnd, 2),
+			padLeft(pt.sectionDepth, 2),
+			padLeft(pt.sectionId, 2),
+			padLeft(pt.dataEnd, 4),
+			padLeft(pt.dataStart, 4),
+			padLeft(pt.adaptorId, 2),
+			padLeft(pt.tokenOutIdx, 2),
+			padLeft(pt.tokenInIdx, 2),
+			padLeft(pt.amountOutMinIdx, 2),
+			padLeft(pt.amountInIdx, 2)
+		)!,
+		64
+	)
 }
 
 export type UniswapV2SwapData = {
@@ -90,8 +115,8 @@ export type SwapData =
 export type RoutePart = {
 	amountIn?: BigNumberish
 	amountOutMin?: BigNumberish
-	tokenIn: BigNumberish
-	tokenOut: BigNumberish
+	tokenIn: string
+	tokenOut: string
 	swapData: SwapData
 	sectionId: number
 	sectionDepth: number
@@ -101,7 +126,7 @@ export type RoutePart = {
 export type EncodedRoute = {
 	parts: BigNumberish[]
 	amounts: BigNumberish[]
-	tokens: BigNumberish[]
+	tokens: string[]
 	data: string
 }
 
@@ -146,7 +171,7 @@ export function encodeAdaptorIdAndSwapData(swapData: SwapData): AdaptorIdAndSwap
 }
 
 export function encodeRoute(routeParts: RoutePart[]): EncodedRoute {
-	let tokens = new IndexMap<BigNumberish>()
+	let tokens = new IndexMap<string>()
 	let amounts = new IndexMap<BigNumberish>()
 	routeParts.forEach(pt => {
 		tokens.add(pt.tokenIn)
