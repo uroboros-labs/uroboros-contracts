@@ -36,6 +36,18 @@ contract UroborusRouter {
 	{
 		(amounts, skipMask) = simulateSwap(params);
 		// this.swapSection(params, amounts, skipMask, 0x0, params.parts.length, 0x0);
+		bytes memory data = abi.encodeWithSelector(
+			this.swapSection.selector,
+			params,
+			amounts,
+			skipMask,
+			0x0,
+			params.parts.length,
+			0x0
+		);
+		bool success;
+		(success, data) = address(this).delegatecall(data);
+		require(success, RevertReasonParser.parse(data));
 	}
 
 	function simulateSwap(SwapParams calldata params)
@@ -81,12 +93,21 @@ contract UroborusRouter {
 			}
 			if (params.parts[i].sectionDepth() > depth) {
 				uint256 sectionEnd = params.parts[i].sectionEnd();
-				try
-					this.swapSection(params, amounts, skipMask, i, sectionEnd, depth + 0x1)
-				returns (uint256[] memory newAmounts) {
-					amounts = newAmounts;
-				} catch Error(string memory reason) {
-					emit Error(reason);
+				bytes memory data = abi.encodeWithSelector(
+					this.swapSection.selector,
+					params,
+					amounts,
+					skipMask,
+					i,
+					sectionEnd,
+					depth + 0x1
+				);
+				bool success;
+				(success, data) = address(this).delegatecall(data);
+				if (success) {
+					amounts = abi.decode(data, (uint256[]));
+				} else {
+					emit Error(RevertReasonParser.parse(data));
 				}
 				i = sectionEnd;
 			} else {
@@ -103,6 +124,12 @@ contract UroborusRouter {
 	) internal {
 		address tokenIn = params.tokens[params.parts[i].tokenInIdx()];
 		uint256 amountIn = getAmountIn(params, amounts, i);
+		{
+			uint256 balance = IERC20(tokenIn).selfBalance();
+			if (balance < amountIn) {
+				IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn - balance);
+			}
+		}
 		bytes memory data = abi.encodeWithSelector(
 			IAdaptor.swap.selector,
 			tokenIn,
@@ -113,12 +140,16 @@ contract UroborusRouter {
 		uint256 preBalance = IERC20(tokenOut).selfBalance();
 		bool success;
 		(success, data) = params.parts[i].getAdaptor(params.deployer).delegatecall(data);
-		require(success, RevertReasonParser.parse(data));
+		if (!success) {
+			revert(RevertReasonParser.parse(data));
+		}
 		uint256 postBalance = IERC20(tokenOut).selfBalance();
+		require(postBalance >= preBalance, "UrbRouter: negative output");
+		amounts[i] = postBalance - preBalance;
 		uint256 idx = params.parts[i].amountOutMinIdx();
 		require(
-			idx > params.amounts.length || preBalance + params.amounts[idx] >= postBalance,
-			"UrbRouter: insufficient amount"
+			idx >= params.amounts.length || amounts[i] >= params.amounts[idx],
+			"UrbRouter: insufficient output"
 		);
 	}
 
@@ -133,7 +164,7 @@ contract UroborusRouter {
 		} else if (partIdx > 0x0) {
 			return amounts[partIdx - 0x1];
 		} else {
-			revert("UrbRouter: amount not provided");
+			revert("UrbRouter: input not provided");
 		}
 	}
 }

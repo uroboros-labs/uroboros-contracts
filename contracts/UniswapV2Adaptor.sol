@@ -29,8 +29,8 @@ contract UniswapV2Adaptor is IAdaptor {
 		bytes memory data
 	) external payable {
 		address addr = data.pairAddress();
-		uint256 amount0Out;
-		uint256 amount1Out = _quote(addr, amountIn, data);
+		uint256 amount0Out = _quote(addr, amountIn, data);
+		uint256 amount1Out;
 		if (data.zeroForOne()) {
 			(amount0Out, amount1Out) = (amount1Out, amount0Out);
 		}
