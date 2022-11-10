@@ -32,7 +32,9 @@ contract UroborusRouter {
 		payable
 		returns (uint256[] memory amounts, uint256 skipMask)
 	{
-		(amounts, skipMask) = simulateSwap(params);
+		// (amounts, skipMask) = simulateSwap(params);
+		uint256[] memory balances = new uint256[](params.tokens.length);
+		quoteSection(params, balances, 0x0, params.parts.length, 0x0);
 		bytes memory data = abi.encodeWithSelector(
 			this.swapSection.selector,
 			params,
@@ -74,6 +76,90 @@ contract UroborusRouter {
 		}
 	}
 
+	/// @return balances
+	/// @return amounts
+	/// @return skipMask
+	function quoteSection(
+		SwapParams calldata params,
+		uint256[] memory balances,
+		uint256 start,
+		uint256 end,
+		uint256 depth
+	)
+		internal
+		view
+		returns (
+			bool,
+			uint256[] memory,
+			uint256[] memory,
+			uint256
+		)
+	{
+		require(start <= end, "UrbRouter: negative length section");
+		uint256[] memory amounts = new uint256[](end - start);
+		for (uint256 i = start; i < end; ) {
+			uint256 sectionDepth = params.parts[i].sectionDepth();
+			if (sectionDepth > depth) {
+				uint256 sectionEnd = params.parts[i].sectionEnd();
+				(
+					bool ok,
+					uint256[] memory sectionAmounts,
+					uint256[] memory sectionBalances,
+
+				) = quoteSection(params, balances, i, sectionEnd, depth + 0x1);
+				if (ok) {
+					for (uint256 j; j < sectionAmounts.length; j++) {
+						amounts[i + j] = sectionAmounts[j];
+					}
+					balances = sectionBalances;
+					// skipMask = sectionSkipMask;
+				}
+				i = sectionEnd;
+			} else {
+				uint256 amountIn;
+				address tokenIn;
+				{
+					// scope for {token,amount}InIdx
+					uint256 tokenInIdx = params.parts[i].tokenInIdx();
+					require(
+						tokenInIdx < params.tokens.length,
+						"UrbRouter: token index out of 'tokens' bounds"
+					);
+					tokenIn = params.tokens[tokenInIdx];
+					uint256 amountInIdx = params.parts[i].amountInIdx();
+					if (amountInIdx >= params.amounts.length) {
+						require(
+							tokenInIdx < balances.length,
+							"UrbRouter: token index out of 'balances' bounds"
+						);
+						amountIn = balances[tokenInIdx];
+					} else {
+						amountIn = params.amounts[tokenInIdx];
+					}
+				}
+				address adaptor = params.deployer.getAddress(params.parts[i].adaptorId());
+				bytes memory data;
+				{
+					// scope for data{Start,End}
+					uint256 dataStart = params.parts[i].dataStart();
+					uint256 dataEnd = params.parts[i].dataEnd();
+					require(dataEnd >= dataStart, "UrbRouter: negative length data");
+					data = params.data[dataStart:dataEnd];
+				}
+				amounts[i] = IAdaptor(adaptor).quote(tokenIn, amountIn, data);
+				uint256 amountOutMinIdx = params.parts[i].amountOutMinIdx();
+				if (amountOutMinIdx < params.amounts.length) {
+					uint256 amountOutMin = params.amounts[amountOutMinIdx];
+					if (amountOutMin > amounts[i]) {
+						return (false, amounts, balances, 0x0);
+					}
+				}
+				i++;
+			}
+		}
+		return (true, amounts, balances, 0x0); // todo skipMask
+	}
+
 	function swapSection(
 		SwapParams calldata params,
 		uint256[] memory amounts,
@@ -82,6 +168,7 @@ contract UroborusRouter {
 		uint256 end,
 		uint256 depth
 	) external returns (uint256[] memory) {
+		require(start <= end, "UrbRouter: negative length section");
 		console.log("section:: start: %s, end: %s, depth: %s", start, end, depth);
 		for (uint256 i = start; i < end; ) {
 			if (skipMask.get(params.parts[i].sectionId())) {
