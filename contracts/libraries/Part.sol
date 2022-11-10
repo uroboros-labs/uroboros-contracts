@@ -74,6 +74,11 @@ library Part {
 		return (self >> 0x58) & 0xff;
 	}
 
+	/// Specifies if a part can transfer additional parts
+	function isInput(uint256 self) internal pure returns (bool) {
+		return (self >> 0x60) & 0x1 != 0x0;
+	}
+
 	function getAdaptor(uint256 self, address deployer) internal view returns (address) {
 		return UrbDeployer.getAddress(deployer, adaptorId(self));
 	}

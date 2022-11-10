@@ -8,6 +8,10 @@ library Math {
 		z = x < y ? x : y;
 	}
 
+	function max(uint256 x, uint256 y) internal pure returns (uint256 z) {
+		z = x < y ? y : x;
+	}
+
 	// babylonian method (https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Babylonian_method)
 	function sqrt(uint256 y) internal pure returns (uint256 z) {
 		if (y > 3) {

@@ -35,11 +35,13 @@ export type SwapPart = {
 	sectionId: number
 	sectionDepth: number
 	sectionEnd: number
+	isInput?: boolean
 }
 
 export function encodeSwapPart(pt: SwapPart): string {
 	return padLeft(
 		encodePacked(
+			pt.isInput ? "0x01" : "0x00",
 			padLeft(pt.sectionEnd, 2),
 			padLeft(pt.sectionDepth, 2),
 			padLeft(pt.sectionId, 2),
@@ -80,6 +82,7 @@ export type RoutePart = {
 	sectionId: number
 	sectionDepth: number
 	sectionEnd: number
+	isInput?: boolean
 }
 
 export type EncodedRoute = {
@@ -165,6 +168,7 @@ export function encodeRoute(routeParts: RoutePart[]): EncodedRoute {
 			sectionId: pt.sectionId,
 			sectionDepth: pt.sectionDepth,
 			sectionEnd: pt.sectionEnd,
+			isInput: pt.isInput,
 		})
 	})
 	return {

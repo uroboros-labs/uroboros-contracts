@@ -233,6 +233,7 @@ describe("RouteExecutor", () => {
 				sectionId: 0,
 				sectionDepth: 0,
 				sectionEnd: 3,
+				isInput: true,
 			},
 			{
 				amountIn: "1974119997742504967",
@@ -264,9 +265,9 @@ describe("RouteExecutor", () => {
 				sectionId: 0,
 				sectionDepth: 0,
 				sectionEnd: 0,
-				inputIdx: 1,
 			},
 		])
+		console.log(route)
 
 		// let tokens = [WETH.address, USDC.address, URB.address]
 		// let route: UroborusRouter.PartStruct[] = [
