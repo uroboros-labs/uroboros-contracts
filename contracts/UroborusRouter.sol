@@ -52,6 +52,7 @@ contract UroborusRouter {
 		view
 		returns (uint256[] memory amounts, uint256 skipMask)
 	{
+		console.log("params.parts.length: %s", params.parts.length);
 		amounts = new uint256[](params.parts.length);
 		for (uint256 i; i < params.parts.length; ) {
 			if (skipMask.get(params.parts[i].sectionId())) {
@@ -149,8 +150,9 @@ contract UroborusRouter {
 		}
 		if (!checkAmountOutMin(params, amounts, partIdx)) {
 			// return revert if amountOut is insufficient
+			data = abi.encode(amounts);
 			assembly {
-				revert(add(amounts, 0x20), mload(amounts))
+				revert(add(data, 0x20), mload(data))
 			}
 		}
 	}
@@ -160,13 +162,33 @@ contract UroborusRouter {
 		uint256[] memory amounts,
 		uint256 partIdx
 	) internal pure returns (uint256) {
-		uint256 idx = params.parts[partIdx].amountInIdx();
+		require(partIdx < params.parts.length, "UrbRouter: part idx out of bounds");
+		uint256 part = params.parts[partIdx];
+		uint256 idx = part.amountInIdx();
 		if (idx < params.amounts.length) {
 			return params.amounts[idx];
-		} else if (partIdx > 0x0) {
-			return amounts[partIdx - 0x1];
 		} else {
-			revert("UrbRouter: input not provided");
+			require(partIdx > 0x0, "UrbRouter: input not provided");
+			uint256 amountIn;
+			uint256 tokenOutIdx = params.parts[partIdx].tokenOutIdx();
+			uint256 tokenInIdx = params.parts[partIdx].tokenInIdx();
+			for (uint256 j = partIdx; j != type(uint256).max; ) {
+				if (params.parts[j].tokenOutIdx() == tokenOutIdx) {
+					amountIn += amounts[j];
+				} else if (params.parts[j].tokenInIdx() == tokenInIdx) {
+					idx = params.parts[j].amountInIdx();
+					if (idx >= params.amounts.length) {
+						break;
+					}
+					unchecked {
+						amountIn -= params.amounts[idx];
+					}
+				}
+				unchecked {
+					j--;
+				}
+			}
+			return amountIn;
 		}
 	}
 
@@ -176,6 +198,6 @@ contract UroborusRouter {
 		uint256 partIdx
 	) internal pure returns (bool) {
 		uint256 idx = params.parts[partIdx].amountOutMinIdx();
-		return idx > params.amounts.length || amounts[partIdx] >= params.amounts[idx];
+		return idx >= params.amounts.length || amounts[partIdx] >= params.amounts[idx];
 	}
 }

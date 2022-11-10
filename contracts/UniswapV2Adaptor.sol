@@ -8,7 +8,6 @@ import "./libraries/UniswapV2Data.sol";
 import "./libraries/Hex.sol";
 
 import "@openzeppelin/contracts/utils/Strings.sol";
-import "hardhat/console.sol";
 
 contract UniswapV2Adaptor is IAdaptor {
 	using Fee for uint256;
@@ -19,8 +18,7 @@ contract UniswapV2Adaptor is IAdaptor {
 		uint256 amountIn,
 		bytes memory data
 	) public view returns (uint256) {
-		console.log("data: %s", Hex.toHex(data));
-		return _quote(data.pairAddress(), amountIn, data);
+		return data.buyFee().getAmountLessFee(_quote(data.pairAddress(), amountIn, data));
 	}
 
 	function swap(
@@ -47,10 +45,8 @@ contract UniswapV2Adaptor is IAdaptor {
 		if (data.zeroForOne()) {
 			(reserveIn, reserveOut) = (reserveOut, reserveIn);
 		}
-		amountIn = Fee.mul(data.swapFee(), data.sellFee()).getAmountLessFee(amountIn);
-		uint256 amountOut = data.buyFee().getAmountLessFee(
-			getAmountOut(amountIn, reserveIn, reserveOut)
-		);
+		amountIn = data.swapFee().mul(data.sellFee()).getAmountLessFee(amountIn);
+		uint256 amountOut = getAmountOut(amountIn, reserveIn, reserveOut);
 		return amountOut;
 	}
 

@@ -74,11 +74,6 @@ library Part {
 		return (self >> 0x58) & 0xff;
 	}
 
-	/// Input part index, used if amountIn not specified, returns index of part to use, if
-	function inputIdx(uint256 self) internal pure returns (uint256) {
-		return (self >> 0x60) & 0xff;
-	}
-
 	function getAdaptor(uint256 self, address deployer) internal view returns (address) {
 		return UrbDeployer.getAddress(deployer, adaptorId(self));
 	}
