@@ -256,7 +256,7 @@ describe("RouteExecutor", () => {
 				tokenOut: WETH.address,
 				swapData: {
 					type: "uniswap-v2",
-					address: urbUsdcPair12.address,
+					address: wethUsdcPair15.address,
 					swapFee: 30,
 					sellFee: 0,
 					buyFee: 0,
@@ -269,66 +269,12 @@ describe("RouteExecutor", () => {
 		])
 		console.log(route)
 
-		// let tokens = [WETH.address, USDC.address, URB.address]
-		// let route: UroborusRouter.PartStruct[] = [
-		// 	{
-		// 		amountIn: "1000000000000000000",
-		// 		amountOutMin: "1974119997742504967",
-		// 		sectionId: 1,
-		// 		tokenInId: 0,
-		// 		tokenOutId: 1,
-		// 		adaptor: uniswapV2Adaptor.address,
-		// 		data: encodeUniswapV2Swap({
-		// 			pairAddress: wethUsdcPair14.address,
-		// 			tokenIn: WETH.address,
-		// 			tokenOut: USDC.address,
-		// 			swapFee: 30,
-		// 			sellFee: 0,
-		// 			buyFee: 0,
-		// 		})!,
-		// 	},
-		// 	{
-		// 		amountIn: "1974119997742504967",
-		// 		amountOutMin: 0,
-		// 		sectionId: 1,
-		// 		tokenInId: 1,
-		// 		tokenOutId: 2,
-		// 		adaptor: uniswapV2Adaptor.address,
-		// 		data: encodeUniswapV2Swap({
-		// 			pairAddress: urbUsdcPair12.address,
-		// 			tokenIn: USDC.address,
-		// 			tokenOut: URB.address,
-		// 			swapFee: 30,
-		// 			sellFee: 0,
-		// 			buyFee: 0,
-		// 		})!,
-		// 	},
-		// 	{
-		// 		amountIn: 0,
-		// 		amountOutMin: 0,
-		// 		sectionId: 1,
-		// 		tokenInId: 1,
-		// 		tokenOutId: 0,
-		// 		adaptor: uniswapV2Adaptor.address,
-		// 		data: encodeUniswapV2Swap({
-		// 			pairAddress: wethUsdcPair15.address,
-		// 			tokenIn: USDC.address,
-		// 			tokenOut: WETH.address,
-		// 			swapFee: 30,
-		// 			sellFee: 0,
-		// 			buyFee: 0,
-		// 		})!,
-		// 	},
-		// ]
-
-		// we can create input segment for this
-
 		let [amounts, skip] = await urbRouter.callStatic.swap({ ...route, deployer })
 		console.log(amounts)
 		console.log(skip)
 		expect(amounts[0]).eq("3948239995485009935") // WETH(1) -> USDC(3.9) ~1/4
 		expect(amounts[1]).eq("974411898691759675") // USDC(1.9) -> URB(0.9) ~2/1
-		expect(amounts[2]).eq("392056908979145419") // USDC(1.9) -> WETH(0.39) ~1/5
+		expect(amounts[2]).eq("392056908979145418") // USDC(1.9) -> WETH(0.39) ~1/5
 	})
 
 	// // in that case two NFT's should be minted

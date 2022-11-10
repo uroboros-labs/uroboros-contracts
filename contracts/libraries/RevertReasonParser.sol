@@ -20,7 +20,7 @@ library RevertReasonParser {
 				reason := add(data, 68)
 			}
 			require(data.length >= 68 + bytes(reason).length, "Invalid revert reason");
-			return string.concat("Error(", reason, ")");
+			return reason;
 		} else if (
 			data.length == 36 &&
 			data[0] == 0x4e &&

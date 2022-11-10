@@ -33,9 +33,6 @@ contract UroborusRouter {
 		payable
 		returns (uint256[] memory amounts, uint256 skipMask)
 	{
-		// (amounts, skipMask) = simulateSwap(params);
-		// uint256[] memory balances = new uint256[](params.tokens.length);
-		// quoteSection(params, balances, 0x0, params.parts.length, 0x0);
 		(amounts, skipMask) = quote(params);
 		bytes memory data = abi.encodeWithSelector(
 			this.swapSection.selector,
@@ -80,6 +77,7 @@ contract UroborusRouter {
 			address tokenIn;
 			uint256 amountIn;
 			{
+				// scope for sectionDepth, {token,amount}InIdx
 				uint256 tokenInIdx = params.parts[i].tokenInIdx();
 				require(tokenInIdx < params.tokens.length, "UrbRouter: token index out of bounds");
 				tokenIn = params.tokens[tokenInIdx];
@@ -131,6 +129,7 @@ contract UroborusRouter {
 			console.log("amountOut: %s", amounts[i]);
 
 			{
+				// scope for tokenOutIdx
 				uint256 tokenOutIdx = params.parts[i].tokenOutIdx();
 				require(tokenOutIdx < params.tokens.length, "UrbRouter: token index out of bounds");
 				tokenAmounts[tokenOutIdx][depth] += amounts[i];
@@ -194,79 +193,72 @@ contract UroborusRouter {
 	function swapPart(
 		SwapParams calldata params,
 		uint256[] memory amounts,
-		uint256 partIdx
+		uint256 i
 	) internal {
-		console.log("swap:: i: %s, sectionId: %s", partIdx, params.parts[partIdx].sectionId());
-		address tokenIn = params.tokens[params.parts[partIdx].tokenInIdx()];
-		uint256 amountIn = getAmountIn(params, amounts, partIdx);
-		console.log("swap:: amountIn: %s", amountIn);
+		address tokenIn;
+		uint256 amountIn;
 		{
-			// todo this
+			// scope for balance, {token,amount}InIdx
+			uint256 tokenInIdx = params.parts[i].tokenInIdx();
+			require(tokenInIdx < params.tokens.length, "UrbRouter: token index out of bounds");
+			tokenIn = params.tokens[tokenInIdx];
+
+			uint256 amountInIdx = params.parts[i].amountInIdx();
 			uint256 balance = IERC20(tokenIn).selfBalance();
-			if (balance < amountIn) {
-				require(params.parts[partIdx].isInput(), "UrbRouter: insufficient input");
-				unchecked {
-					IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn - balance);
+			if (amountInIdx < params.amounts.length) {
+				amountIn = params.amounts[amountInIdx];
+				if (amountIn > balance) {
+					require(params.parts[i].isInput(), "UrbRouter: insufficient input");
+					unchecked {
+						IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn - balance);
+					}
 				}
+			} else {
+				amountIn = balance;
 			}
 		}
-		bytes memory data = abi.encodeWithSelector(
-			IAdaptor.swap.selector,
-			tokenIn,
-			amountIn,
-			params.data[params.parts[partIdx].dataStart():params.parts[partIdx].dataEnd()]
-		);
-		address tokenOut = params.tokens[params.parts[partIdx].tokenOutIdx()];
-		uint256 preBalance = IERC20(tokenOut).selfBalance();
-		bool success;
-		(success, data) = params.parts[partIdx].getAdaptor(params.deployer).delegatecall(data);
-		require(success, RevertReasonParser.parse(data));
-		uint256 postBalance = IERC20(tokenOut).selfBalance();
-		require(postBalance >= preBalance, "UrbRouter: negative output");
-		unchecked {
-			amounts[partIdx] = postBalance - preBalance;
+
+		bytes memory data;
+		{
+			// scope for data{Start,End}
+			uint256 dataStart = params.parts[i].dataStart();
+			uint256 dataEnd = params.parts[i].dataEnd();
+			require(dataEnd >= dataStart, "UrbRouter: negative length data");
+			data = params.data[dataStart:dataEnd];
 		}
-		if (!checkAmountOutMin(params, amounts, partIdx)) {
+		data = abi.encodeWithSelector(IAdaptor.swap.selector, tokenIn, amountIn, data);
+
+		address tokenOut;
+		{
+			// scope for tokenOutIdx
+			uint256 tokenOutIdx = params.parts[i].tokenOutIdx();
+			require(tokenOutIdx < params.tokens.length, "UrbRouter: token index out of bounds");
+			tokenOut = params.tokens[tokenOutIdx];
+		}
+
+		address adaptor = UrbDeployer.getAddress(params.deployer, params.parts[i].adaptorId());
+
+		{
+			// scope for success, {post,pre}Balance
+			uint256 preBalance = IERC20(tokenOut).selfBalance();
+
+			bool success;
+			(success, data) = adaptor.delegatecall(data);
+			require(success, RevertReasonParser.parse(data));
+
+			uint256 postBalance = IERC20(tokenOut).selfBalance();
+			require(postBalance >= preBalance, "UrbRouter: negative output");
+			unchecked {
+				amounts[i] = postBalance - preBalance;
+			}
+		}
+
+		if (!checkAmountOutMin(params, amounts, i)) {
 			// return revert if amountOut is insufficient
 			data = abi.encode(amounts);
 			assembly {
 				revert(add(data, 0x20), mload(data))
 			}
-		}
-	}
-
-	function getAmountIn(
-		SwapParams calldata params,
-		uint256[] memory amounts,
-		uint256 partIdx
-	) internal pure returns (uint256) {
-		require(partIdx < params.parts.length, "UrbRouter: part idx out of bounds");
-		uint256 part = params.parts[partIdx];
-		uint256 idx = part.amountInIdx();
-		if (idx < params.amounts.length) {
-			return params.amounts[idx];
-		} else {
-			require(partIdx > 0x0, "UrbRouter: input not provided");
-			uint256 amountIn;
-			uint256 tokenOutIdx = params.parts[partIdx].tokenOutIdx();
-			uint256 tokenInIdx = params.parts[partIdx].tokenInIdx();
-			for (uint256 j = partIdx; j != type(uint256).max; ) {
-				if (params.parts[j].tokenOutIdx() == tokenOutIdx) {
-					amountIn += amounts[j];
-				} else if (params.parts[j].tokenInIdx() == tokenInIdx) {
-					idx = params.parts[j].amountInIdx();
-					if (idx >= params.amounts.length) {
-						break;
-					}
-					unchecked {
-						amountIn -= params.amounts[idx];
-					}
-				}
-				unchecked {
-					j--;
-				}
-			}
-			return amountIn;
 		}
 	}
 
