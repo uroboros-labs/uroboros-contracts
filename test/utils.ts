@@ -24,25 +24,6 @@ export async function createUniswapV2Pair(
 	return pair
 }
 
-export type UniswapV2SwapParams = {
-	pairAddress: string
-	tokenIn: BigNumberish
-	tokenOut: BigNumberish
-	swapFee: number
-	sellFee: number
-	buyFee: number
-}
-
-export function encodeUniswapV2Swap(p: UniswapV2SwapParams): string | null {
-	return encodePacked(
-		BigNumber.from(p.tokenIn).gt(p.tokenOut) ? "0x01" : "0x00",
-		padLeft(p.swapFee, 2),
-		padLeft(p.sellFee, 4),
-		padLeft(p.buyFee, 4),
-		p.pairAddress
-	)
-}
-
 export type SwapPart = {
 	amountInIdx: number
 	amountOutMinIdx: number
@@ -140,7 +121,6 @@ export function encodeUniswapV2SwapData(data: UniswapV2SwapData): string {
 }
 
 export function getZeroForOne(tokenIn: BigNumberish, tokenOut: BigNumberish): boolean {
-	console.log(tokenIn, tokenOut)
 	return BigNumber.from(tokenIn).lt(tokenOut)
 }
 
