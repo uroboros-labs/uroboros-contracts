@@ -69,8 +69,11 @@ contract UroborusRouter {
 		uint256 depth; // most recent depth
 		bool success; // most recent amountOutMin check result
 
-		for (uint256 i; i < params.parts.length; i++) {
+		for (uint256 i; i < params.parts.length; ) {
+			console.log("i: %s", i);
 			if (skipMask.get(params.parts[i].sectionId())) {
+				i++;
+				console.log("skipped");
 				continue;
 			}
 
@@ -84,13 +87,17 @@ contract UroborusRouter {
 
 				uint256 sectionDepth = params.parts[i].sectionDepth();
 				if (sectionDepth > depth) {
+					// when new global depth is reached, we copy current tokenAmount to new one
 					tokenAmounts[tokenInIdx][sectionDepth] = tokenAmounts[tokenInIdx][depth];
 				} else if (sectionDepth < depth && !success) {
+					// and when lower global depth is reached, we copy higher to new one
+					// BUT we could have skipped some tokens because of depth
 					tokenAmounts[tokenInIdx][depth] = tokenAmounts[tokenInIdx][sectionDepth];
 				}
 				depth = sectionDepth;
 
-				uint256 amountInIdx = params.parts[i].tokenInIdx();
+				uint256 amountInIdx = params.parts[i].amountInIdx();
+				console.log("amountInIdx: %s", amountInIdx);
 				if (amountInIdx >= params.amounts.length) {
 					// if amountIn not provided
 					amountIn = tokenAmounts[tokenInIdx][depth];
@@ -140,9 +147,12 @@ contract UroborusRouter {
 				amountOutMinIdx >= params.amounts.length ||
 				amounts[i] >= params.amounts[amountOutMinIdx];
 			if (!success) {
-				skipMask = skipMask.set(amounts[i].sectionId());
+				skipMask = skipMask.set(params.parts[i].sectionId());
 				console.log("amountOutMin: %s", params.amounts[amountOutMinIdx]);
 				i = params.parts[i].sectionEnd();
+				console.log("sectionEnd: %s", i);
+			} else {
+				i++;
 			}
 			console.log("success: %s", success);
 			console.log("===============");

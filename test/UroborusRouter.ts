@@ -84,135 +84,139 @@ describe("RouteExecutor", () => {
 		])
 	})
 
-	// it("WETH -> USDC -> URB", async () => {
-	// 	let route = encodeRoute([
-	// 		{
-	// 			amountIn: "10000000000000000",
-	// 			tokenIn: WETH.address,
-	// 			tokenOut: USDC.address,
-	// 			swapData: {
-	// 				type: "uniswap-v2",
-	// 				address: wethUsdcPair14.address,
-	// 				swapFee: 30,
-	// 				sellFee: 0,
-	// 				buyFee: 0,
-	// 				zeroForOne: getZeroForOne(WETH.address, USDC.address),
-	// 			},
-	// 			sectionId: 0,
-	// 			sectionDepth: 0,
-	// 			sectionEnd: 0, // sectionEnd is used when depth > currentDepth
-	// 		},
-	// 		{
-	// 			tokenIn: USDC.address,
-	// 			tokenOut: URB.address,
-	// 			swapData: {
-	// 				type: "uniswap-v2",
-	// 				address: urbUsdcPair12.address,
-	// 				swapFee: 30,
-	// 				sellFee: 0,
-	// 				buyFee: 0,
-	// 				zeroForOne: getZeroForOne(USDC.address, URB.address),
-	// 			},
-	// 			sectionId: 0,
-	// 			sectionDepth: 0,
-	// 			sectionEnd: 0,
-	// 		},
-	// 	])
-	// 	console.log(route)
-	// 	let [amounts, skip] = await urbRouter.callStatic.swap({ ...route, deployer })
-	// 	console.log(amounts)
-	// 	console.log(skip)
-	// 	expect(amounts[0]).eq("39872025157812017")
-	// 	expect(amounts[1]).eq("19870261882150628")
-	// })
+	it("WETH -> USDC -> URB", async () => {
+		let route = encodeRoute([
+			{
+				amountIn: "10000000000000000",
+				tokenIn: WETH.address,
+				tokenOut: USDC.address,
+				swapData: {
+					type: "uniswap-v2",
+					address: wethUsdcPair14.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+					zeroForOne: getZeroForOne(WETH.address, USDC.address),
+				},
+				sectionId: 0,
+				sectionDepth: 0,
+				sectionEnd: 0, // sectionEnd is used when depth > currentDepth
+				isInput: true,
+			},
+			{
+				tokenIn: USDC.address,
+				tokenOut: URB.address,
+				swapData: {
+					type: "uniswap-v2",
+					address: urbUsdcPair12.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+					zeroForOne: getZeroForOne(USDC.address, URB.address),
+				},
+				sectionId: 0,
+				sectionDepth: 0,
+				sectionEnd: 0,
+			},
+		])
+		console.log(route)
+		let [amounts, skip] = await urbRouter.callStatic.swap({ ...route, deployer })
+		console.log(amounts)
+		console.log(skip)
+		expect(amounts[0]).eq("39872025157812017")
+		expect(amounts[1]).eq("19870261882150628")
+	})
 
-	// it("USDC->WETH->USDC, 41->15", async () => {
-	// 	let route = encodeRoute([
-	// 		{
-	// 			amountIn: "1000000000000000000",
-	// 			tokenIn: USDC.address,
-	// 			tokenOut: WETH.address,
-	// 			swapData: {
-	// 				type: "uniswap-v2",
-	// 				address: wethUsdcPair14.address,
-	// 				swapFee: 30,
-	// 				sellFee: 0,
-	// 				buyFee: 0,
-	// 				zeroForOne: getZeroForOne(USDC.address, WETH.address),
-	// 			},
-	// 			sectionId: 0,
-	// 			sectionDepth: 0,
-	// 			sectionEnd: 0,
-	// 		},
-	// 		{
-	// 			amountOutMin: "1000000000000000000",
-	// 			tokenIn: WETH.address,
-	// 			tokenOut: USDC.address,
-	// 			swapData: {
-	// 				type: "uniswap-v2",
-	// 				address: wethUsdcPair15.address,
-	// 				swapFee: 30,
-	// 				sellFee: 0,
-	// 				buyFee: 0,
-	// 				zeroForOne: getZeroForOne(WETH.address, USDC.address),
-	// 			},
-	// 			sectionId: 0,
-	// 			sectionDepth: 0,
-	// 			sectionEnd: 0,
-	// 		},
-	// 	])
-	// 	console.log(route)
-	// 	let [amounts, skip] = await urbRouter.callStatic.swap({ ...route, deployer })
-	// 	console.log(amounts)
-	// 	console.log(skip)
-	// 	expect(amounts[0]).eq("248605413159054346")
-	// 	expect(amounts[1]).eq("1236110171506408603")
-	// })
+	it("USDC->WETH->USDC, 41->15", async () => {
+		let route = encodeRoute([
+			{
+				amountIn: "1000000000000000000",
+				tokenIn: USDC.address,
+				tokenOut: WETH.address,
+				swapData: {
+					type: "uniswap-v2",
+					address: wethUsdcPair14.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+					zeroForOne: getZeroForOne(USDC.address, WETH.address),
+				},
+				sectionId: 0,
+				sectionDepth: 0,
+				sectionEnd: 0,
+				isInput: true,
+			},
+			{
+				amountOutMin: "1000000000000000000",
+				tokenIn: WETH.address,
+				tokenOut: USDC.address,
+				swapData: {
+					type: "uniswap-v2",
+					address: wethUsdcPair15.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+					zeroForOne: getZeroForOne(WETH.address, USDC.address),
+				},
+				sectionId: 0,
+				sectionDepth: 0,
+				sectionEnd: 0,
+			},
+		])
+		console.log(route)
+		let [amounts, skip] = await urbRouter.callStatic.swap({ ...route, deployer })
+		console.log(amounts)
+		console.log(skip)
+		expect(amounts[0]).eq("248605413159054346")
+		expect(amounts[1]).eq("1236110171506408603")
+	})
 
-	// it("WETH->USDC,URB->USDC", async () => {
-	// 	let route = encodeRoute([
-	// 		{
-	// 			amountIn: "1000000000000000000",
-	// 			tokenIn: WETH.address,
-	// 			tokenOut: USDC.address,
-	// 			swapData: {
-	// 				type: "uniswap-v2",
-	// 				address: wethUsdcPair14.address,
-	// 				swapFee: 30,
-	// 				sellFee: 0,
-	// 				buyFee: 0,
-	// 				zeroForOne: getZeroForOne(WETH.address, USDC.address),
-	// 			},
-	// 			sectionId: 0,
-	// 			sectionDepth: 1,
-	// 			sectionEnd: 1,
-	// 		},
-	// 		{
-	// 			amountIn: "1000000000000000",
-	// 			// amountOutMin: "1000000000000000000000000000000", // mistically freezes when set
-	// 			// need to check nested sections
-	// 			tokenIn: URB.address,
-	// 			tokenOut: USDC.address,
-	// 			swapData: {
-	// 				type: "uniswap-v2",
-	// 				address: urbUsdcPair12.address,
-	// 				swapFee: 30,
-	// 				sellFee: 0,
-	// 				buyFee: 0,
-	// 				zeroForOne: getZeroForOne(URB.address, USDC.address),
-	// 			},
-	// 			sectionId: 1,
-	// 			sectionDepth: 1,
-	// 			sectionEnd: 2,
-	// 		},
-	// 	])
-	// 	console.log(route)
-	// 	let [amounts, skip] = await urbRouter.callStatic.swap({ ...route, deployer })
-	// 	console.log(amounts)
-	// 	console.log(skip)
-	// 	expect(amounts[0]).eq("3948239995485009935")
-	// 	expect(amounts[1]).eq("1993780124005943")
-	// })
+	it("WETH->USDC,URB->USDC", async () => {
+		let route = encodeRoute([
+			{
+				amountIn: "1000000000000000000",
+				tokenIn: WETH.address,
+				tokenOut: USDC.address,
+				swapData: {
+					type: "uniswap-v2",
+					address: wethUsdcPair14.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+					zeroForOne: getZeroForOne(WETH.address, USDC.address),
+				},
+				sectionId: 0,
+				sectionDepth: 1,
+				sectionEnd: 1,
+				isInput: true,
+			},
+			{
+				amountIn: "1000000000000000",
+				// amountOutMin: "1000000000000000000000000000000", // mistically freezes when set
+				// need to check nested sections
+				tokenIn: URB.address,
+				tokenOut: USDC.address,
+				swapData: {
+					type: "uniswap-v2",
+					address: urbUsdcPair12.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+					zeroForOne: getZeroForOne(URB.address, USDC.address),
+				},
+				sectionId: 1,
+				sectionDepth: 1,
+				sectionEnd: 2,
+				isInput: true,
+			},
+		])
+		console.log(route)
+		let [amounts, skip] = await urbRouter.callStatic.swap({ ...route, deployer })
+		console.log(amounts)
+		console.log(skip)
+		expect(amounts[0]).eq("3948239995485009935")
+		expect(amounts[1]).eq("1993780124005943")
+	})
 
 	it("WETH->USDC->URB,USDC->WETH, fork - proper balance use", async () => {
 		// this is top level section with split-trade
@@ -274,133 +278,84 @@ describe("RouteExecutor", () => {
 		console.log(skip)
 		expect(amounts[0]).eq("3948239995485009935") // WETH(1) -> USDC(3.9) ~1/4
 		expect(amounts[1]).eq("974411898691759675") // USDC(1.9) -> URB(0.9) ~2/1
-		expect(amounts[2]).eq("392056908979145418") // USDC(1.9) -> WETH(0.39) ~1/5
+		expect(amounts[2]).eq("392056908979145419") // USDC(1.9) -> WETH(0.39) ~1/5
 	})
 
-	// // in that case two NFT's should be minted
-	// it("USDC->URB,WETH->BTC, two independent routes", async () => {
-	// 	let tokens = [USDC.address, URB.address, WETH.address, BTC.address]
-	// 	let route: UroborusRouter.PartStruct[] = [
-	// 		{
-	// 			amountIn: "1000000000000000000",
-	// 			amountOutMin: 0,
-	// 			sectionId: 1,
-	// 			tokenInId: 0,
-	// 			tokenOutId: 1,
-	// 			adaptor: uniswapV2Adaptor.address,
-	// 			data: encodeUniswapV2Swap({
-	// 				pairAddress: urbUsdcPair12.address,
-	// 				tokenIn: USDC.address,
-	// 				tokenOut: URB.address,
-	// 				swapFee: 30,
-	// 				sellFee: 0,
-	// 				buyFee: 0,
-	// 			})!,
-	// 		},
-	// 		{
-	// 			amountIn: "1000000000000000000",
-	// 			amountOutMin: 0,
-	// 			sectionId: 2,
-	// 			tokenInId: 2,
-	// 			tokenOutId: 3,
-	// 			adaptor: uniswapV2Adaptor.address,
-	// 			data: encodeUniswapV2Swap({
-	// 				pairAddress: btcWethPair17.address,
-	// 				tokenIn: WETH.address,
-	// 				tokenOut: BTC.address,
-	// 				swapFee: 30,
-	// 				sellFee: 0,
-	// 				buyFee: 0,
-	// 			})!,
-	// 		},
-	// 	]
+	it("URB->(USDC->WETH->USDC)->BTC, cancelled cycle", async () => {
+		let route = encodeRoute([
+			{
+				isInput: true,
+				amountIn: "1000000000000000000",
+				tokenIn: URB.address,
+				tokenOut: USDC.address,
+				swapData: {
+					type: "uniswap-v2",
+					address: urbUsdcPair12.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+					zeroForOne: getZeroForOne(URB.address, USDC.address),
+				},
+				sectionId: 0,
+				sectionDepth: 0,
+				sectionEnd: 4,
+			},
+			{
+				tokenIn: USDC.address,
+				tokenOut: WETH.address,
+				swapData: {
+					type: "uniswap-v2",
+					address: wethUsdcPair14.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+					zeroForOne: getZeroForOne(USDC.address, WETH.address),
+				},
+				sectionId: 1,
+				sectionDepth: 1,
+				sectionEnd: 3,
+			},
+			{
+				amountOutMin: "2428514733306148413",
+				tokenIn: WETH.address,
+				tokenOut: USDC.address,
+				swapData: {
+					type: "uniswap-v2",
+					address: wethUsdcPair15.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+					zeroForOne: getZeroForOne(WETH.address, USDC.address),
+				},
+				sectionId: 1,
+				sectionDepth: 1,
+				sectionEnd: 3,
+			},
+			{
+				tokenIn: USDC.address,
+				tokenOut: BTC.address,
+				swapData: {
+					type: "uniswap-v2",
+					address: btcUsdcPair19.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+					zeroForOne: getZeroForOne(USDC.address, BTC.address),
+				},
+				sectionId: 0,
+				sectionDepth: 0,
+				sectionEnd: 4,
+			},
+		])
+		console.log(route)
 
-	// 	let [amounts, skip] = await urbRouter.callStatic.executeRoute(route, tokens)
-	// 	console.log(amounts)
-	// 	console.log(skip)
-	// 	expect(amounts[0]).eq("495977798662566437") // ~2/1
-	// 	expect(amounts[1]).eq("142211755857978829") // ~7/1
-	// })
-
-	// it("URB->(USDC->WETH->USDC)->BTC, cancelled cycle", async () => {
-	// 	let tokens = [URB.address, USDC.address, WETH.address, BTC.address]
-	// 	let route: UroborusRouter.PartStruct[] = [
-	// 		{
-	// 			amountIn: "1000000000000000000",
-	// 			amountOutMin: 0,
-	// 			sectionId: 0,
-	// 			tokenInId: 0,
-	// 			tokenOutId: 1,
-	// 			adaptor: uniswapV2Adaptor.address,
-	// 			data: encodeUniswapV2Swap({
-	// 				pairAddress: urbUsdcPair12.address,
-	// 				tokenIn: URB.address,
-	// 				tokenOut: USDC.address,
-	// 				swapFee: 30,
-	// 				sellFee: 0,
-	// 				buyFee: 0,
-	// 			})!,
-	// 		},
-	// 		{
-	// 			// 1974119997742504967
-	// 			amountIn: 0,
-	// 			amountOutMin: 0,
-	// 			sectionId: 1,
-	// 			tokenInId: 1,
-	// 			tokenOutId: 2,
-	// 			adaptor: uniswapV2Adaptor.address,
-	// 			data: encodeUniswapV2Swap({
-	// 				pairAddress: wethUsdcPair14.address,
-	// 				tokenIn: USDC.address,
-	// 				tokenOut: WETH.address,
-	// 				swapFee: 30,
-	// 				sellFee: 0,
-	// 				buyFee: 0,
-	// 			})!,
-	// 		},
-	// 		{
-	// 			// 489591267126799483
-	// 			amountIn: 0,
-	// 			amountOutMin: "2428514733306148413",
-	// 			sectionId: 1,
-	// 			tokenInId: 2,
-	// 			tokenOutId: 1,
-	// 			adaptor: uniswapV2Adaptor.address,
-	// 			data: encodeUniswapV2Swap({
-	// 				pairAddress: wethUsdcPair15.address,
-	// 				tokenIn: WETH.address,
-	// 				tokenOut: USDC.address,
-	// 				swapFee: 30,
-	// 				sellFee: 0,
-	// 				buyFee: 0,
-	// 			})!,
-	// 		},
-	// 		{
-	// 			// 2428514733306148412
-	// 			amountIn: 0,
-	// 			amountOutMin: 0, // 241680061406581968
-	// 			sectionId: 0,
-	// 			tokenInId: 1,
-	// 			tokenOutId: 3,
-	// 			adaptor: uniswapV2Adaptor.address,
-	// 			data: encodeUniswapV2Swap({
-	// 				pairAddress: btcUsdcPair19.address,
-	// 				tokenIn: USDC.address,
-	// 				tokenOut: BTC.address,
-	// 				swapFee: 30,
-	// 				sellFee: 0,
-	// 				buyFee: 0,
-	// 			})!,
-	// 		},
-	// 	]
-
-	// 	let [amounts, skip] = await urbRouter.callStatic.executeRoute(route, tokens)
-	// 	console.log(amounts)
-	// 	console.log(skip)
-	// 	expect(skip).eq(2) // section 1 skipped
-	// 	expect(amounts[0]).eq("1974119997742504967")
-	// 	expect(amounts[1]).eq("489591267126799483")
-	// 	expect(amounts[2]).eq("2428514733306148412") // <amountOutMin
-	// 	expect(amounts[3]).eq("218189583805294788") // 1974119997742504967->.. ~9/1
-	// })
+		let [amounts, skip] = await urbRouter.callStatic.swap({ ...route, deployer })
+		console.log(amounts)
+		console.log(skip)
+		expect(skip).eq(2) // section 1 skipped
+		expect(amounts[0]).eq("1974119997742504967")
+		expect(amounts[1]).eq("489591267126799483")
+		expect(amounts[2]).eq("2428514733306148412") // <amountOutMin
+		expect(amounts[3]).eq("218189583805294788") // 1974119997742504967->.. ~9/1
+	})
 })
