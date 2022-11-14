@@ -79,6 +79,11 @@ library Part {
 		return (self >> 0x60) & 0x1 != 0x0;
 	}
 
+	// /// Specifies part where token was used last time
+	// function tokenInLastUsedIdx(uint256 self) internal pure returns (uint256) {
+	// 	return (self >> 0x68) & 0xff;
+	// }
+
 	function getAdaptor(uint256 self, address deployer) internal view returns (address) {
 		return UrbDeployer.getAddress(deployer, adaptorId(self));
 	}

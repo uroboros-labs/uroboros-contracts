@@ -93,6 +93,7 @@ contract UroborusRouter {
 				uint256 depth;
 				{
 					uint256 partIdx = tokenPart[tokenInIdx];
+					// uint256 partIdx = params.parts[i].tokenInLastUsedIdx();
 					uint256 sectionId = params.parts[partIdx].sectionId();
 					success = !skipMask.get(sectionId);
 					depth = params.parts[partIdx].sectionDepth();
