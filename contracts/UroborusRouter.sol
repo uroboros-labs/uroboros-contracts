@@ -49,6 +49,7 @@ contract UroborusRouter {
 		bool success;
 		(success, data) = address(this).delegatecall(data);
 		require(success, RevertReasonParser.parse(data));
+		return (abi.decode(data, (uint256[])), skipMask);
 	}
 
 	function quote(SwapParams calldata params)
@@ -197,9 +198,11 @@ contract UroborusRouter {
 				);
 				bool success;
 				(success, data) = address(this).delegatecall(data);
+
 				if (success) {
 					amounts = abi.decode(data, (uint256[]));
 				} else {
+					// on failure, can return both error code and amounts
 					emit Error(RevertReasonParser.parse(data));
 				}
 				i = sectionEnd;
@@ -261,12 +264,15 @@ contract UroborusRouter {
 		{
 			// scope for success, {post,pre}Balance
 			uint256 preBalance = IERC20(tokenOut).selfBalance();
+			console.log("preBalance: %s", preBalance);
 
 			bool success;
 			(success, data) = adaptor.delegatecall(data);
 			require(success, RevertReasonParser.parse(data));
 
 			uint256 postBalance = IERC20(tokenOut).selfBalance();
+			console.log("postBalance: %s", postBalance);
+
 			require(postBalance >= preBalance, "UrbRouter: negative output");
 			unchecked {
 				amounts[i] = postBalance - preBalance;

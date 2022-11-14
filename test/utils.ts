@@ -1,11 +1,17 @@
 import { BigNumber, BigNumberish } from "@ethersproject/bignumber"
 import { ethers } from "hardhat"
 import { encodePacked, padLeft } from "web3-utils"
-import { ERC20PresetFixedSupply, UniswapV2Pair } from "../typechain-types"
+import { UniswapV2Pair } from "../typechain-types"
+import { PromiseOrValue } from "../typechain-types/common"
+
+interface ERC20Like {
+	address: string
+	transfer(to: PromiseOrValue<string>, amount: PromiseOrValue<BigNumberish>): Promise<any>
+}
 
 export async function createUniswapV2Pair(
-	token0: ERC20PresetFixedSupply,
-	token1: ERC20PresetFixedSupply,
+	token0: ERC20Like,
+	token1: ERC20Like,
 	amount0: BigNumberish,
 	amount1: BigNumberish
 ): Promise<UniswapV2Pair> {

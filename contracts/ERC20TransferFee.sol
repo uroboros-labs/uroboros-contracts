@@ -7,6 +7,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./libraries/Fee.sol";
 
+import "hardhat/console.sol";
+
 contract ERC20TransferFee is Ownable, IERC20, IERC20Metadata {
 	using Fee for uint256;
 
@@ -27,11 +29,12 @@ contract ERC20TransferFee is Ownable, IERC20, IERC20Metadata {
 	constructor(
 		string memory _name,
 		string memory _symbol,
-		uint256 _totalSupply
+		uint256 initalSupply
 	) {
 		name = _name;
 		symbol = _symbol;
-		totalSupply = _totalSupply;
+		totalSupply = initalSupply;
+		_mint(_msgSender(), initalSupply);
 	}
 
 	function setTransferToFee(address to, uint256 fee) external onlyOwner {
@@ -42,6 +45,16 @@ contract ERC20TransferFee is Ownable, IERC20, IERC20Metadata {
 	function setTransferFromFee(address from, uint256 fee) external onlyOwner {
 		transferFromFee[from] = fee;
 		emit TransferFromFeeUpdated(from, fee);
+	}
+
+	function mint(address to, uint256 amount) internal onlyOwner {
+		_mint(to, amount);
+	}
+
+	function _mint(address to, uint256 amount) internal {
+		balanceOf[to] += amount;
+		totalSupply += amount;
+		emit Transfer(address(0x0), to, amount);
 	}
 
 	function _transfer(
@@ -55,7 +68,10 @@ contract ERC20TransferFee is Ownable, IERC20, IERC20Metadata {
 		unchecked {
 			balanceOf[owner] -= amount;
 		}
-		amount = amount.getAmountLessFee(_transferFromFee.mul(_transferToFee));
+		uint256 totalFee = _transferFromFee.mul(_transferToFee);
+		console.log("totalFee: %s", totalFee);
+		amount = totalFee.getAmountLessFee(amount);
+		console.log("amountLessFee: %s", amount);
 		balanceOf[to] += amount;
 		emit Transfer(owner, to, amount);
 	}
