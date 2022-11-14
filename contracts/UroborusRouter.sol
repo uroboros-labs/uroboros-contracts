@@ -48,8 +48,11 @@ contract UroborusRouter {
 		);
 		bool success;
 		(success, data) = address(this).delegatecall(data);
-		require(success, RevertReasonParser.parse(data));
-		return (abi.decode(data, (uint256[])), skipMask);
+		if (success || RevertReasonParser.getType(data) == RevertReasonParser.ErrorType.Unknown) {
+			amounts = abi.decode(data, (uint256[]));
+		} else {
+			revert(RevertReasonParser.parse(data));
+		}
 	}
 
 	function quote(SwapParams calldata params)
@@ -199,10 +202,12 @@ contract UroborusRouter {
 				bool success;
 				(success, data) = address(this).delegatecall(data);
 
-				if (success) {
+				RevertReasonParser.ErrorType errorType = RevertReasonParser.getType(data);
+				if (success || errorType == RevertReasonParser.ErrorType.Unknown) {
 					amounts = abi.decode(data, (uint256[]));
 				} else {
 					// on failure, can return both error code and amounts
+					// can either wrap this call
 					emit Error(RevertReasonParser.parse(data));
 				}
 				i = sectionEnd;
@@ -264,14 +269,17 @@ contract UroborusRouter {
 		{
 			// scope for success, {post,pre}Balance
 			uint256 preBalance = IERC20(tokenOut).selfBalance();
-			console.log("preBalance: %s", preBalance);
 
 			bool success;
 			(success, data) = adaptor.delegatecall(data);
-			require(success, RevertReasonParser.parse(data));
+			if (!success) {
+				assembly {
+					revert(add(data, 0x20), mload(data))
+				}
+			}
+			// require(success, RevertReasonParser.parse(data));
 
 			uint256 postBalance = IERC20(tokenOut).selfBalance();
-			console.log("postBalance: %s", postBalance);
 
 			require(postBalance >= preBalance, "UrbRouter: negative output");
 			unchecked {
