@@ -22,6 +22,7 @@ let deployer: string,
 	btcWethPair17: UniswapV2Pair,
 	btcUsdcPair19: UniswapV2Pair,
 	usdcSfmPair16: UniswapV2Pair,
+	urbSfmPair14: UniswapV2Pair,
 	urbRouter: UroborusRouter,
 	uniswapV2Adaptor: UniswapV2Adaptor
 
@@ -81,6 +82,7 @@ describe("RouteExecutor", () => {
 			btcWethPair17,
 			btcUsdcPair19,
 			usdcSfmPair16,
+			urbSfmPair14,
 		] = await Promise.all([
 			createUniswapV2Pair(WETH, USDC, "100000000000000000000", "400000000000000000000"),
 			createUniswapV2Pair(WETH, USDC, "100000000000000000000", "500000000000000000000"),
@@ -88,11 +90,14 @@ describe("RouteExecutor", () => {
 			createUniswapV2Pair(BTC, WETH, "100000000000000000000", "700000000000000000000"),
 			createUniswapV2Pair(BTC, USDC, "100000000000000000000", "900000000000000000000"),
 			createUniswapV2Pair(USDC, SFM, "100000000000000000000", "600000000000000000000"),
+			createUniswapV2Pair(URB, SFM, "100000000000000000000", "400000000000000000000"),
 		])
 
 		await Promise.all([
 			SFM.setTransferToFee(usdcSfmPair16.address, "3000"),
 			SFM.setTransferFromFee(usdcSfmPair16.address, "2000"),
+			SFM.setTransferToFee(urbSfmPair14.address, "3000"),
+			SFM.setTransferFromFee(urbSfmPair14.address, "2000"),
 		])
 
 		await Promise.all([
@@ -100,6 +105,49 @@ describe("RouteExecutor", () => {
 			USDC.approve(urbRouter.address, BigNumber.from(1).shl(256).sub(1)),
 			URB.approve(urbRouter.address, BigNumber.from(1).shl(256).sub(1)),
 		])
+	})
+
+	it("URB -> SFM -> USDC", async () => {
+		let route = encodeRoute([
+			{
+				isInput: true,
+				amountIn: "1000000000000000000",
+				tokenIn: URB.address,
+				tokenOut: SFM.address,
+				swapData: {
+					type: "uniswap-v2",
+					address: urbSfmPair14.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 2000,
+					zeroForOne: getZeroForOne(URB.address, SFM.address),
+				},
+				sectionId: 0,
+				sectionDepth: 0,
+				sectionEnd: 2,
+			},
+			{
+				tokenIn: SFM.address,
+				tokenOut: USDC.address,
+				swapData: {
+					type: "uniswap-v2",
+					address: usdcSfmPair16.address,
+					swapFee: 30,
+					sellFee: 3000,
+					buyFee: 0,
+					zeroForOne: getZeroForOne(SFM.address, USDC.address),
+				},
+				sectionId: 0,
+				sectionDepth: 0,
+				sectionEnd: 2,
+			},
+		])
+		console.log(route)
+		let [amounts, skipMask] = await urbRouter.callStatic.swap({ ...route, deployer })
+		console.log(amounts)
+		console.log(skipMask)
+		expect(amounts[0]).eq("3157881352671220601") // URB(1.0) -> SFM(3.15) ~ 1/4 + 20%
+		expect(amounts[1]).eq("365954187525228600") //
 	})
 
 	it("USDC -> SFM, invalid quote fee", async () => {
@@ -127,6 +175,7 @@ describe("RouteExecutor", () => {
 		let [amounts, skipMask] = await urbRouter.callStatic.swap({ ...route, deployer })
 		console.log(amounts)
 		console.log(skipMask)
+		expect(amounts[0]).eq("47835665340662188")
 	})
 
 	it("WETH -> USDC -> URB", async () => {
