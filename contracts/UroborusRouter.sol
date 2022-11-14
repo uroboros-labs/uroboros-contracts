@@ -7,6 +7,7 @@ import "./libraries/RevertReasonParser.sol";
 import "./libraries/Part.sol";
 import "./libraries/Bitmap.sol";
 import "./libraries/Math.sol";
+import "./libraries/Strings2.sol";
 
 import "hardhat/console.sol";
 
@@ -17,6 +18,8 @@ contract UroborusRouter {
 	using UrbDeployer for address;
 	using UrbERC20 for IERC20;
 	using BitMap for uint256;
+
+	using Strings2 for uint256[][];
 
 	event Error(string reason);
 
@@ -57,36 +60,25 @@ contract UroborusRouter {
 
 		// depth should never be greater than current depth
 		uint256[][] memory tokenAmounts = new uint256[][](params.tokens.length);
-		uint256[] memory tokenDepths = new uint256[](params.tokens.length);
 
-		for (uint256 i; i < params.parts.length; i++) {
-			uint256 tokenInIdx = params.parts[i].tokenInIdx();
-			uint256 tokenOutIdx = params.parts[i].tokenOutIdx();
-			uint256 sectionDepth = params.parts[i].sectionDepth();
-			// tokenDepth tracks token max depth now
-			tokenDepths[tokenInIdx] = Math.max(tokenDepths[tokenInIdx], sectionDepth);
-			tokenDepths[tokenOutIdx] = Math.max(tokenDepths[tokenOutIdx], sectionDepth);
-		}
-		for (uint256 i; i < params.tokens.length; i++) {
-			tokenAmounts[i] = new uint256[](tokenDepths[i] + 0x1);
-			tokenDepths[i] = 0x0; // reset tokenDepth to track current depth
+		{
+			uint256[] memory tokenDepths = new uint256[](params.tokens.length);
+			for (uint256 i; i < params.parts.length; i++) {
+				uint256 tokenInIdx = params.parts[i].tokenInIdx();
+				uint256 tokenOutIdx = params.parts[i].tokenOutIdx();
+				uint256 sectionDepth = params.parts[i].sectionDepth();
+				tokenDepths[tokenInIdx] = Math.max(tokenDepths[tokenInIdx], sectionDepth);
+				tokenDepths[tokenOutIdx] = Math.max(tokenDepths[tokenOutIdx], sectionDepth);
+			}
+			for (uint256 i; i < params.tokens.length; i++) {
+				tokenAmounts[i] = new uint256[](tokenDepths[i] + 0x1);
+			}
 		}
 
 		uint256 depth;
+		bool success;
 		for (uint256 i; i < params.parts.length; ) {
-			// what if a section had only one part and it didn't succeed?
-			bool success = !skipMask.get(params.parts[i].sectionId());
-			uint256 sectionDepth = params.parts[i].sectionDepth();
-
-			if (sectionDepth > depth || (sectionDepth < depth && success)) {
-				for (uint256 j; j < params.tokens.length; j++) {
-					if (tokenDepths[j] == depth) {
-						tokenAmounts[j][sectionDepth] = tokenAmounts[j][depth];
-						tokenDepths[j] = sectionDepth;
-					}
-				}
-			}
-			depth = sectionDepth;
+			console.log("i: %s", i);
 
 			address tokenIn;
 			uint256 amountIn;
@@ -96,24 +88,38 @@ contract UroborusRouter {
 				require(tokenInIdx < params.tokens.length, "UrbRouter: token index out of bounds");
 				tokenIn = params.tokens[tokenInIdx];
 
+				uint256 sectionDepth = params.parts[i].sectionDepth();
+				console.log("depth: %s, sectionDepth: %s", depth, sectionDepth);
+				console.log("success: %s", success);
+				// this works linearly:
+				// only next depth input token is copied from previous depth (depth and success are changed)
+				// if in the next segment we would like to take another token from previous depth, it will fail
+				if (depth != sectionDepth && success) {
+					tokenAmounts[tokenInIdx][sectionDepth] = tokenAmounts[tokenInIdx][depth];
+				}
+				depth = sectionDepth;
+				console.log("tokenAmounts: %s", tokenAmounts.toString());
+
 				uint256 amountInIdx = params.parts[i].amountInIdx();
 				if (amountInIdx >= params.amounts.length) {
 					// if amountIn not provided
-					amountIn = tokenAmounts[tokenInIdx][tokenDepths[tokenInIdx]];
+					amountIn = tokenAmounts[tokenInIdx][depth];
 				} else {
 					amountIn = params.amounts[amountInIdx];
 				}
 
 				if (!params.parts[i].isInput()) {
 					require(
-						tokenAmounts[tokenInIdx][tokenDepths[tokenInIdx]] >= amountIn,
+						tokenAmounts[tokenInIdx][depth] >= amountIn,
 						"UrbRouter: insufficient input"
 					);
 					unchecked {
-						tokenAmounts[tokenInIdx][tokenDepths[tokenInIdx]] -= amountIn;
+						tokenAmounts[tokenInIdx][depth] -= amountIn;
 					}
 				}
 			}
+
+			console.log("amountIn: %s", amountIn);
 
 			address adaptor = params.deployer.getAddress(params.parts[i].adaptorId());
 			bytes memory data;
@@ -126,25 +132,29 @@ contract UroborusRouter {
 			}
 
 			amounts[i] = IAdaptor(adaptor).quote(tokenIn, amountIn, data);
+			console.log("amountOut: %s", amounts[i]);
 
 			{
 				// scope for tokenOutIdx
 				uint256 tokenOutIdx = params.parts[i].tokenOutIdx();
 				require(tokenOutIdx < params.tokens.length, "UrbRouter: token index out of bounds");
-				tokenAmounts[tokenOutIdx][tokenDepths[tokenOutIdx]] += amounts[i];
+				tokenAmounts[tokenOutIdx][depth] += amounts[i];
 			}
 
 			uint256 amountOutMinIdx = params.parts[i].amountOutMinIdx();
 			success =
 				amountOutMinIdx >= params.amounts.length ||
 				amounts[i] >= params.amounts[amountOutMinIdx];
+			console.log("success: %s", success);
 			if (!success) {
+				console.log("amountOutMin: %s", params.amounts[amountOutMinIdx]);
 				skipMask = skipMask.set(params.parts[i].sectionId());
 				// if we jump to end of skipped section, we don't need to skip it every time
 				i = params.parts[i].sectionEnd();
 			} else {
 				i++;
 			}
+			console.log("===============");
 		}
 	}
 
