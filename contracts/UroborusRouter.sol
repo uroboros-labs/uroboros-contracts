@@ -60,6 +60,9 @@ contract UroborusRouter {
 
 		// depth should never be greater than current depth
 		uint256[][] memory tokenAmounts = new uint256[][](params.tokens.length);
+		// token -> part -> {success,depth}
+		// points to last part, where token was used
+		uint256[] memory tokenPart = new uint256[](params.tokens.length);
 
 		{
 			uint256[] memory tokenDepths = new uint256[](params.tokens.length);
@@ -75,8 +78,6 @@ contract UroborusRouter {
 			}
 		}
 
-		uint256 depth;
-		bool success;
 		for (uint256 i; i < params.parts.length; ) {
 			console.log("i: %s", i);
 
@@ -88,33 +89,39 @@ contract UroborusRouter {
 				require(tokenInIdx < params.tokens.length, "UrbRouter: token index out of bounds");
 				tokenIn = params.tokens[tokenInIdx];
 
+				bool success;
+				uint256 depth;
+				{
+					uint256 partIdx = tokenPart[tokenInIdx];
+					uint256 sectionId = params.parts[partIdx].sectionId();
+					success = !skipMask.get(sectionId);
+					depth = params.parts[partIdx].sectionDepth();
+				}
+
 				uint256 sectionDepth = params.parts[i].sectionDepth();
-				console.log("depth: %s, sectionDepth: %s", depth, sectionDepth);
-				console.log("success: %s", success);
-				// this works linearly:
-				// only next depth input token is copied from previous depth (depth and success are changed)
-				// if in the next segment we would like to take another token from previous depth, it will fail
-				if (depth != sectionDepth && success) {
+
+				if (success && depth != sectionDepth) {
 					tokenAmounts[tokenInIdx][sectionDepth] = tokenAmounts[tokenInIdx][depth];
 				}
-				depth = sectionDepth;
+
+				tokenPart[tokenInIdx] = i;
 				console.log("tokenAmounts: %s", tokenAmounts.toString());
 
 				uint256 amountInIdx = params.parts[i].amountInIdx();
 				if (amountInIdx >= params.amounts.length) {
 					// if amountIn not provided
-					amountIn = tokenAmounts[tokenInIdx][depth];
+					amountIn = tokenAmounts[tokenInIdx][sectionDepth];
 				} else {
 					amountIn = params.amounts[amountInIdx];
 				}
 
 				if (!params.parts[i].isInput()) {
 					require(
-						tokenAmounts[tokenInIdx][depth] >= amountIn,
+						tokenAmounts[tokenInIdx][sectionDepth] >= amountIn,
 						"UrbRouter: insufficient input"
 					);
 					unchecked {
-						tokenAmounts[tokenInIdx][depth] -= amountIn;
+						tokenAmounts[tokenInIdx][sectionDepth] -= amountIn;
 					}
 				}
 			}
@@ -137,22 +144,25 @@ contract UroborusRouter {
 			{
 				// scope for tokenOutIdx
 				uint256 tokenOutIdx = params.parts[i].tokenOutIdx();
+				tokenPart[tokenOutIdx] = i; // update token's last use
 				require(tokenOutIdx < params.tokens.length, "UrbRouter: token index out of bounds");
-				tokenAmounts[tokenOutIdx][depth] += amounts[i];
+				uint256 sectionDepth = params.parts[i].sectionDepth();
+				tokenAmounts[tokenOutIdx][sectionDepth] += amounts[i];
 			}
 
-			uint256 amountOutMinIdx = params.parts[i].amountOutMinIdx();
-			success =
-				amountOutMinIdx >= params.amounts.length ||
-				amounts[i] >= params.amounts[amountOutMinIdx];
-			console.log("success: %s", success);
-			if (!success) {
-				console.log("amountOutMin: %s", params.amounts[amountOutMinIdx]);
-				skipMask = skipMask.set(params.parts[i].sectionId());
-				// if we jump to end of skipped section, we don't need to skip it every time
-				i = params.parts[i].sectionEnd();
-			} else {
-				i++;
+			{
+				uint256 amountOutMinIdx = params.parts[i].amountOutMinIdx();
+				bool success = amountOutMinIdx >= params.amounts.length ||
+					amounts[i] >= params.amounts[amountOutMinIdx];
+				console.log("success: %s", success);
+				if (!success) {
+					console.log("amountOutMin: %s", params.amounts[amountOutMinIdx]);
+					skipMask = skipMask.set(params.parts[i].sectionId());
+					// if we jump to end of skipped section, we don't need to skip it every time
+					i = params.parts[i].sectionEnd();
+				} else {
+					i++;
+				}
 			}
 			console.log("===============");
 		}
