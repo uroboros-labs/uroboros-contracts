@@ -4,6 +4,14 @@ pragma solidity >=0.8.17;
 import "./UrbDeployer.sol";
 
 library Part {
+	function amountInPtr(uint256 self) internal pure returns (uint256) {}
+
+	function amountOutMinPtr(uint256 self) internal pure returns (uint256) {}
+
+	function tokenInPtr(uint256 self) internal pure returns (uint256) {}
+
+	function tokenOutPtr(uint256 self) internal pure returns (uint256) {}
+
 	/// amountIn index
 	/// @notice if part has not amountIn, returns index out of amounts[] bounds
 	function amountInIdx(uint256 self) internal pure returns (uint256) {

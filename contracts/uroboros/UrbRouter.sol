@@ -2,9 +2,11 @@
 pragma solidity >=0.8.15;
 
 import "../common/libraries/math/Math.sol";
+import "../common/libraries/SafeCast.sol";
 import "../common/libraries/RevertReasonParser.sol";
 import "../common/libraries/Bitmap.sol";
 import "../common/libraries/Strings2.sol";
+import "../common/libraries/Bytes.sol";
 
 import "./libraries/UrbERC20.sol";
 import "./libraries/Part.sol";
@@ -13,14 +15,15 @@ import "./interfaces/IAdaptor.sol";
 
 import "hardhat/console.sol";
 
-/// @title Uroborus Router
-/// @author maksfourlife
 contract UrbRouter {
 	using Part for uint256;
 	using UrbDeployer for address;
 	using UrbERC20 for IERC20;
 	using SafeERC20 for IERC20;
 	using BitMap for uint256;
+	using Bytes for bytes;
+	using SafeCast for bytes32;
+	using Math for uint256;
 
 	using Strings2 for uint256[][];
 
@@ -29,8 +32,6 @@ contract UrbRouter {
 	struct SwapParams {
 		address deployer;
 		uint256[] parts;
-		uint256[] amounts;
-		address[] tokens;
 		bytes data;
 	}
 
@@ -58,12 +59,12 @@ contract UrbRouter {
 		(success, data) = address(this).delegatecall(data);
 		if (success || RevertReasonParser.getType(data) == RevertReasonParser.ErrorType.Unknown) {
 			amounts = abi.decode(data, (uint256[]));
-			for (uint256 i; i < params.tokens.length; i++) {
-				uint256 balance = IERC20(params.tokens[i]).selfBalance();
-				if (balance != 0x0) {
-					IERC20(params.tokens[i]).safeTransfer(msg.sender, balance);
-				}
-			}
+			// for (uint256 i; i < params.tokens.length; i++) {
+			// 	uint256 balance = IERC20(params.tokens[i]).selfBalance();
+			// 	if (balance != 0x0) {
+			// 		IERC20(params.tokens[i]).safeTransfer(msg.sender, balance);
+			// 	}
+			// }
 		} else {
 			revert(RevertReasonParser.parse(data));
 		}
@@ -78,21 +79,22 @@ contract UrbRouter {
 		amounts = new uint256[](params.parts.length);
 
 		// depth should never be greater than current depth
-		uint256[][] memory tokenAmounts = new uint256[][](params.tokens.length);
+		uint256 numTokens = getNumTokens(params);
+		uint256[][] memory tokenAmounts = new uint256[][](numTokens);
 		// token -> part -> {success,depth}
 		// points to last part, where token was used
-		uint256[] memory tokenPart = new uint256[](params.tokens.length);
+		uint256[] memory tokenPart = new uint256[](numTokens);
 
 		{
-			uint256[] memory tokenDepths = new uint256[](params.tokens.length);
+			uint256[] memory tokenDepths = new uint256[](numTokens);
 			for (uint256 i; i < params.parts.length; i++) {
-				uint256 tokenInIdx = params.parts[i].tokenInIdx();
-				uint256 tokenOutIdx = params.parts[i].tokenOutIdx();
+				uint256 tokenInPtr = params.parts[i].tokenInPtr();
+				uint256 tokenOutPtr = params.parts[i].tokenOutPtr();
 				uint256 sectionDepth = params.parts[i].sectionDepth();
-				tokenDepths[tokenInIdx] = Math.max(tokenDepths[tokenInIdx], sectionDepth);
-				tokenDepths[tokenOutIdx] = Math.max(tokenDepths[tokenOutIdx], sectionDepth);
+				tokenDepths[tokenInPtr] = Math.max(tokenDepths[tokenInPtr], sectionDepth);
+				tokenDepths[tokenOutPtr] = Math.max(tokenDepths[tokenOutPtr], sectionDepth);
 			}
-			for (uint256 i; i < params.tokens.length; i++) {
+			for (uint256 i; i < numTokens; i++) {
 				tokenAmounts[i] = new uint256[](tokenDepths[i] + 0x1);
 			}
 		}
@@ -104,14 +106,15 @@ contract UrbRouter {
 			uint256 amountIn;
 			{
 				// scope for sectionDepth, {token,amount}InIdx
-				uint256 tokenInIdx = params.parts[i].tokenInIdx();
-				require(tokenInIdx < params.tokens.length, "UrbRouter: token index out of bounds");
-				tokenIn = params.tokens[tokenInIdx];
+				uint256 tokenInPtr = params.parts[i].tokenInPtr();
+				require(tokenInPtr < numTokens, "UrbRouter: token index out of bounds");
+				// tokenIn = params.tokens[tokenInIdx];
+				tokenIn = params.data.valueAt(tokenInPtr).toAddress();
 
 				bool success;
 				uint256 depth;
 				{
-					uint256 partIdx = tokenPart[tokenInIdx];
+					uint256 partIdx = tokenPart[tokenInPtr];
 					// uint256 partIdx = params.parts[i].tokenInLastUsedIdx();
 					uint256 sectionId = params.parts[partIdx].sectionId();
 					success = !skipMask.get(sectionId);
@@ -121,27 +124,27 @@ contract UrbRouter {
 				uint256 sectionDepth = params.parts[i].sectionDepth();
 
 				if (success && depth != sectionDepth) {
-					tokenAmounts[tokenInIdx][sectionDepth] = tokenAmounts[tokenInIdx][depth];
+					tokenAmounts[tokenInPtr][sectionDepth] = tokenAmounts[tokenInPtr][depth];
 				}
 
-				tokenPart[tokenInIdx] = i;
+				tokenPart[tokenInPtr] = i;
 				console.log("tokenAmounts: %s", tokenAmounts.toString());
 
-				uint256 amountInIdx = params.parts[i].amountInIdx();
-				if (amountInIdx >= params.amounts.length) {
+				uint256 amountInPtr = params.parts[i].amountInPtr();
+				if (amountInPtr >= params.data.valueAt(amountInPtr).toUint()) {
 					// if amountIn not provided
-					amountIn = tokenAmounts[tokenInIdx][sectionDepth];
+					amountIn = tokenAmounts[tokenInPtr][sectionDepth];
 				} else {
-					amountIn = params.amounts[amountInIdx];
+					amountIn = params.data.valueAt(amountInPtr).toUint();
 				}
 
 				if (!params.parts[i].isInput()) {
 					require(
-						tokenAmounts[tokenInIdx][sectionDepth] >= amountIn,
+						tokenAmounts[tokenInPtr][sectionDepth] >= amountIn,
 						"UrbRouter: insufficient input"
 					);
 					unchecked {
-						tokenAmounts[tokenInIdx][sectionDepth] -= amountIn;
+						tokenAmounts[tokenInPtr][sectionDepth] -= amountIn;
 					}
 				}
 			}
@@ -163,20 +166,19 @@ contract UrbRouter {
 
 			{
 				// scope for tokenOutIdx
-				uint256 tokenOutIdx = params.parts[i].tokenOutIdx();
-				tokenPart[tokenOutIdx] = i; // update token's last use
-				require(tokenOutIdx < params.tokens.length, "UrbRouter: token index out of bounds");
+				uint256 tokenOutPtr = params.parts[i].tokenOutPtr();
+				tokenPart[tokenOutPtr] = i; // update token's last use
 				uint256 sectionDepth = params.parts[i].sectionDepth();
-				tokenAmounts[tokenOutIdx][sectionDepth] += amounts[i];
+				tokenAmounts[tokenOutPtr][sectionDepth] += amounts[i];
 			}
 
 			{
-				uint256 amountOutMinIdx = params.parts[i].amountOutMinIdx();
-				bool success = amountOutMinIdx >= params.amounts.length ||
-					amounts[i] >= params.amounts[amountOutMinIdx];
+				uint256 amountOutMinPtr = params.parts[i].amountInPtr();
+				bool success = amountOutMinPtr.isZero() ||
+					amounts[i] >= params.data.valueAt(amountOutMinPtr).toUint();
 				console.log("success: %s", success);
 				if (!success) {
-					console.log("amountOutMin: %s", params.amounts[amountOutMinIdx]);
+					console.log("amountOutMin: %s", params.data.valueAt(amountOutMinPtr).toUint());
 					skipMask = skipMask.set(params.parts[i].sectionId());
 					// if we jump to end of skipped section, we don't need to skip it every time
 					i = params.parts[i].sectionEnd();
@@ -187,6 +189,8 @@ contract UrbRouter {
 			console.log("===============");
 		}
 	}
+
+	function getNumTokens(SwapParams calldata params) internal pure returns (uint256) {}
 
 	function swapSection(
 		SwapParams calldata params,
@@ -240,31 +244,31 @@ contract UrbRouter {
 		uint256 amountIn;
 		{
 			// scope for balance, {token,amount}InIdx
-			uint256 tokenInIdx = params.parts[i].tokenInIdx();
-			require(tokenInIdx < params.tokens.length, "UrbRouter: token index out of bounds");
-			tokenIn = params.tokens[tokenInIdx];
+			uint256 tokenInPtr = params.parts[i].tokenInPtr();
+			// require(tokenInIdx < params.tokens.length, "UrbRouter: token index out of bounds");
+			tokenIn = params.data.valueAt(tokenInPtr).toAddress();
 
-			uint256 amountInIdx = params.parts[i].amountInIdx();
+			uint256 amountInPtr = params.parts[i].amountInPtr();
 			uint256 balance = IERC20(tokenIn).selfBalance();
-			if (amountInIdx < params.amounts.length) {
-				amountIn = params.amounts[amountInIdx];
+			if (amountInPtr.isZero()) {
+				amountIn = balance;
+			} else {
+				amountIn = params.data.valueAt(amountInPtr).toUint();
 				if (amountIn > balance) {
 					require(params.parts[i].isInput(), "UrbRouter: insufficient input");
 					unchecked {
 						IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn - balance);
 					}
 				}
-			} else {
-				amountIn = balance;
 			}
 		}
 
 		address tokenOut;
 		{
 			// scope for tokenOutIdx
-			uint256 tokenOutIdx = params.parts[i].tokenOutIdx();
-			require(tokenOutIdx < params.tokens.length, "UrbRouter: token index out of bounds");
-			tokenOut = params.tokens[tokenOutIdx];
+			uint256 tokenOutPtr = params.parts[i].tokenOutPtr();
+			// require(tokenOutIdx < params.tokens.length, "UrbRouter: token index out of bounds");
+			tokenOut = params.data.valueAt(tokenOutPtr).toAddress();
 		}
 
 		address adaptor = UrbDeployer.getAddress(params.deployer, params.parts[i].adaptorId());
@@ -300,13 +304,15 @@ contract UrbRouter {
 			}
 		}
 
-		uint256 amountOutMinIdx = params.parts[i].amountOutMinIdx();
-		if (
-			amountOutMinIdx < params.amounts.length && amounts[i] < params.amounts[amountOutMinIdx]
-		) {
-			data = abi.encode(amounts);
-			assembly {
-				revert(add(data, 0x20), mload(data))
+		{
+			uint256 amountOutMinPtr = params.parts[i].amountOutMinPtr();
+			bool success = amountOutMinPtr.isZero() ||
+				amounts[i] >= params.data.valueAt(amountOutMinPtr).toUint();
+			if (!success) {
+				data = abi.encode(amounts);
+				assembly {
+					revert(add(data, 0x20), mload(data))
+				}
 			}
 		}
 	}
