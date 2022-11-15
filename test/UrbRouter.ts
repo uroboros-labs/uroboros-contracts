@@ -107,7 +107,7 @@ describe("RouteExecutor", () => {
 		])
 	})
 
-	it("URB -> SFM -> USDC", async () => {
+	it("URB->SFM->USDC", async () => {
 		let route = encodeRoute([
 			{
 				isInput: true,

@@ -31,10 +31,10 @@ export async function createUniswapV2Pair(
 }
 
 export type SwapPart = {
-	amountInIdx: number
-	amountOutMinIdx: number
-	tokenInIdx: number
-	tokenOutIdx: number
+	amountInPtr: number
+	amountOutMinPtr: number
+	tokenInId: number
+	tokenOutId: number
 	adaptorId: number
 	dataStart: number
 	dataEnd: number
@@ -56,10 +56,10 @@ export function encodeSwapPart(pt: SwapPart): string {
 			padLeft(pt.dataEnd, 4),
 			padLeft(pt.dataStart, 4),
 			padLeft(pt.adaptorId, 2),
-			padLeft(pt.tokenOutIdx, 2),
-			padLeft(pt.tokenInIdx, 2),
-			padLeft(pt.amountOutMinIdx, 2),
-			padLeft(pt.amountInIdx, 2)
+			padLeft(pt.tokenOutId, 2),
+			padLeft(pt.tokenInId, 2),
+			padLeft(pt.amountOutMinPtr, 4),
+			padLeft(pt.amountInPtr, 4)
 		)!,
 		64
 	)
@@ -96,8 +96,6 @@ export type RoutePart = {
 
 export type EncodedRoute = {
 	parts: BigNumberish[]
-	amounts: BigNumberish[]
-	tokens: string[]
 	data: string
 }
 
@@ -148,6 +146,7 @@ export function encodeAdaptorIdAndSwapData(swapData: SwapData): AdaptorIdAndSwap
 export function encodeRoute(routeParts: RoutePart[]): EncodedRoute {
 	let tokens = new IndexMap<string>()
 	let amounts = new IndexMap<BigNumberish>()
+
 	routeParts.forEach(pt => {
 		tokens.add(pt.tokenIn)
 		tokens.add(pt.tokenOut)
@@ -158,19 +157,28 @@ export function encodeRoute(routeParts: RoutePart[]): EncodedRoute {
 			amounts.add(pt.amountOutMin)
 		}
 	})
+
 	let data = "0x"
+
+	tokens.forEach((_, token) => (data = encodePacked(data, token)!))
+	// console.log(tokens, data)
+	amounts.forEach(
+		(_, amount) => (data = encodePacked(data, padLeft(BigNumber.from(amount)._hex, 64))!)
+	)
+	// console.log(amounts, data)
+
 	let parts = routeParts.map(pt => {
 		let { adaptorId, swapData } = encodeAdaptorIdAndSwapData(pt.swapData)
 		let dataStart = (data.length - 0x2) / 0x2
 		data = encodePacked(data, swapData)!
 		let dataEnd = (data.length - 0x2) / 0x2
 		return encodeSwapPart({
-			// @ts-ignore
-			amountInIdx: pt.amountIn ? amounts.get(pt.amountIn) : amounts.size,
-			// @ts-ignore
-			amountOutMinIdx: pt.amountOutMin ? amounts.get(pt.amountOutMin) : amounts.size,
-			tokenInIdx: tokens.get(pt.tokenIn)!,
-			tokenOutIdx: tokens.get(pt.tokenOut)!,
+			amountInPtr: pt.amountIn ? amounts.get(pt.amountIn)! * 32 + tokens.size * 20 : 0,
+			amountOutMinPtr: pt.amountOutMin
+				? amounts.get(pt.amountOutMin)! * 32 + tokens.size * 20
+				: 0,
+			tokenInId: tokens.get(pt.tokenIn)!,
+			tokenOutId: tokens.get(pt.tokenOut)!,
 			adaptorId,
 			dataStart,
 			dataEnd,
@@ -181,10 +189,11 @@ export function encodeRoute(routeParts: RoutePart[]): EncodedRoute {
 			isOutput: pt.isOutput,
 		})
 	})
+
 	return {
 		parts,
-		tokens: tokens.items(),
-		amounts: amounts.items(),
+		// tokens: tokens.items(),
+		// amounts: amounts.items(),
 		data,
 	}
 }

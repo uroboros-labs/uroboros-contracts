@@ -2,9 +2,9 @@
 pragma solidity >=0.8.15;
 
 library SafeCast {
-	function toAddress(bytes32 self) internal pure returns (address x) {
+	function toLeAddress(bytes32 self) internal pure returns (address x) {
 		assembly {
-			x := and(self, sub(0x0, 0x1))
+			x := shr(0x60, self)
 		}
 	}
 
