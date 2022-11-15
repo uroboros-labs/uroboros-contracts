@@ -7,9 +7,6 @@ import "./libraries/RevertReasonParser.sol";
 import "./libraries/Part.sol";
 import "./libraries/Bitmap.sol";
 import "./libraries/Math.sol";
-import "./libraries/Strings2.sol";
-
-import "hardhat/console.sol";
 
 /// @title Uroborus Router
 /// @author maksfourlife
@@ -19,8 +16,6 @@ contract UroborusRouter {
 	using UrbERC20 for IERC20;
 	using SafeERC20 for IERC20;
 	using BitMap for uint256;
-
-	using Strings2 for uint256[][];
 
 	event Error(string reason);
 
@@ -96,8 +91,6 @@ contract UroborusRouter {
 		}
 
 		for (uint256 i; i < params.parts.length; ) {
-			console.log("i: %s", i);
-
 			address tokenIn;
 			uint256 amountIn;
 			{
@@ -123,7 +116,6 @@ contract UroborusRouter {
 				}
 
 				tokenPart[tokenInIdx] = i;
-				console.log("tokenAmounts: %s", tokenAmounts.toString());
 
 				uint256 amountInIdx = params.parts[i].amountInIdx();
 				if (amountInIdx >= params.amounts.length) {
@@ -144,8 +136,6 @@ contract UroborusRouter {
 				}
 			}
 
-			console.log("amountIn: %s", amountIn);
-
 			address adaptor = params.deployer.getAddress(params.parts[i].adaptorId());
 			bytes memory data;
 			{
@@ -157,7 +147,6 @@ contract UroborusRouter {
 			}
 
 			amounts[i] = IAdaptor(adaptor).quote(tokenIn, amountIn, data);
-			console.log("amountOut: %s", amounts[i]);
 
 			{
 				// scope for tokenOutIdx
@@ -172,9 +161,7 @@ contract UroborusRouter {
 				uint256 amountOutMinIdx = params.parts[i].amountOutMinIdx();
 				bool success = amountOutMinIdx >= params.amounts.length ||
 					amounts[i] >= params.amounts[amountOutMinIdx];
-				console.log("success: %s", success);
 				if (!success) {
-					console.log("amountOutMin: %s", params.amounts[amountOutMinIdx]);
 					skipMask = skipMask.set(params.parts[i].sectionId());
 					// if we jump to end of skipped section, we don't need to skip it every time
 					i = params.parts[i].sectionEnd();
@@ -182,7 +169,6 @@ contract UroborusRouter {
 					i++;
 				}
 			}
-			console.log("===============");
 		}
 	}
 
@@ -195,7 +181,6 @@ contract UroborusRouter {
 		uint256 depth
 	) external returns (uint256[] memory) {
 		require(start <= end, "UrbRouter: negative length section");
-		console.log("section:: start: %s, end: %s, depth: %s", start, end, depth);
 		for (uint256 i = start; i < end; ) {
 			if (skipMask.get(params.parts[i].sectionId())) {
 				i++;

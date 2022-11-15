@@ -5,10 +5,6 @@ import "./interfaces/IAdaptor.sol";
 import "./interfaces/IUniswapV2Pair.sol";
 import "./libraries/Fee.sol";
 import "./libraries/UniswapV2Data.sol";
-import "./libraries/Hex.sol";
-
-import "@openzeppelin/contracts/utils/Strings.sol";
-import "hardhat/console.sol";
 
 contract UniswapV2Adaptor is IAdaptor {
 	using Fee for uint256;
@@ -35,13 +31,6 @@ contract UniswapV2Adaptor is IAdaptor {
 			(amount0Out, amount1Out) = (amount1Out, amount0Out);
 		}
 		IERC20(tokenIn).transfer(addr, amountIn);
-		console.log("zeroForOne: %s", data.zeroForOne());
-		console.log(
-			"amountIn: %s, amount0Out: %s, amount1Out: %s",
-			amountIn,
-			amount0Out,
-			amount1Out
-		);
 		IUniswapV2Pair(addr).swap(amount0Out, amount1Out, to, "");
 	}
 
