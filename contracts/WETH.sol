@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: No license
-pragma solidity >=0.8.15;
+pragma solidity >=0.8.17;
 
 import {IWETH} from "./interfaces/IWETH.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";

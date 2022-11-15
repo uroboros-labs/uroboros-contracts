@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: No license
-pragma solidity >=0.8.15;
+pragma solidity >=0.8.17;
 
 import "./interfaces/IAdaptor.sol";
 import "./interfaces/IUniswapV2Pair.sol";
@@ -25,8 +25,9 @@ contract UniswapV2Adaptor is IAdaptor {
 	function swap(
 		address tokenIn,
 		uint256 amountIn,
-		bytes memory data
-	) external payable {
+		bytes memory data,
+		address to
+	) public payable {
 		address addr = data.pairAddress();
 		uint256 amount0Out = _quote(addr, amountIn, data);
 		uint256 amount1Out;
@@ -41,7 +42,7 @@ contract UniswapV2Adaptor is IAdaptor {
 			amount0Out,
 			amount1Out
 		);
-		IUniswapV2Pair(addr).swap(amount0Out, amount1Out, address(this), "");
+		IUniswapV2Pair(addr).swap(amount0Out, amount1Out, to, "");
 	}
 
 	function _quote(

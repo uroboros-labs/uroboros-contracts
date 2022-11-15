@@ -17,6 +17,7 @@ contract UroborusRouter {
 	using Part for uint256;
 	using UrbDeployer for address;
 	using UrbERC20 for IERC20;
+	using SafeERC20 for IERC20;
 	using BitMap for uint256;
 
 	using Strings2 for uint256[][];
@@ -34,8 +35,13 @@ contract UroborusRouter {
 	function swap(SwapParams calldata params)
 		external
 		payable
-		returns (uint256[] memory amounts, uint256 skipMask)
+		returns (
+			uint256[] memory amounts,
+			uint256 skipMask,
+			uint256 gasUsed
+		)
 	{
+		gasUsed = gasleft();
 		(amounts, skipMask) = quote(params);
 		bytes memory data = abi.encodeWithSelector(
 			this.swapSection.selector,
@@ -50,9 +56,16 @@ contract UroborusRouter {
 		(success, data) = address(this).delegatecall(data);
 		if (success || RevertReasonParser.getType(data) == RevertReasonParser.ErrorType.Unknown) {
 			amounts = abi.decode(data, (uint256[]));
+			for (uint256 i; i < params.tokens.length; i++) {
+				uint256 balance = IERC20(params.tokens[i]).selfBalance();
+				if (balance != 0x0) {
+					IERC20(params.tokens[i]).safeTransfer(msg.sender, balance);
+				}
+			}
 		} else {
 			revert(RevertReasonParser.parse(data));
 		}
+		gasUsed -= gasleft();
 	}
 
 	function quote(SwapParams calldata params)
@@ -206,8 +219,6 @@ contract UroborusRouter {
 				if (success || errorType == RevertReasonParser.ErrorType.Unknown) {
 					amounts = abi.decode(data, (uint256[]));
 				} else {
-					// on failure, can return both error code and amounts
-					// can either wrap this call
 					emit Error(RevertReasonParser.parse(data));
 				}
 				i = sectionEnd;
@@ -246,16 +257,6 @@ contract UroborusRouter {
 			}
 		}
 
-		bytes memory data;
-		{
-			// scope for data{Start,End}
-			uint256 dataStart = params.parts[i].dataStart();
-			uint256 dataEnd = params.parts[i].dataEnd();
-			require(dataEnd >= dataStart, "UrbRouter: negative length data");
-			data = params.data[dataStart:dataEnd];
-		}
-		data = abi.encodeWithSelector(IAdaptor.swap.selector, tokenIn, amountIn, data);
-
 		address tokenOut;
 		{
 			// scope for tokenOutIdx
@@ -266,9 +267,20 @@ contract UroborusRouter {
 
 		address adaptor = UrbDeployer.getAddress(params.deployer, params.parts[i].adaptorId());
 
+		bytes memory data;
+		{
+			// scope for data{Start,End}
+			uint256 dataStart = params.parts[i].dataStart();
+			uint256 dataEnd = params.parts[i].dataEnd();
+			require(dataEnd >= dataStart, "UrbRouter: negative length data");
+			data = params.data[dataStart:dataEnd];
+		}
+		address to = params.parts[i].isOutput() ? msg.sender : address(this);
+		data = abi.encodeWithSelector(IAdaptor.swap.selector, tokenIn, amountIn, data, to);
+
 		{
 			// scope for success, {post,pre}Balance
-			uint256 preBalance = IERC20(tokenOut).selfBalance();
+			uint256 preBalance = IERC20(tokenOut).balanceOf(to);
 
 			bool success;
 			(success, data) = adaptor.delegatecall(data);
@@ -277,9 +289,8 @@ contract UroborusRouter {
 					revert(add(data, 0x20), mload(data))
 				}
 			}
-			// require(success, RevertReasonParser.parse(data));
 
-			uint256 postBalance = IERC20(tokenOut).selfBalance();
+			uint256 postBalance = IERC20(tokenOut).balanceOf(to);
 
 			require(postBalance >= preBalance, "UrbRouter: negative output");
 			unchecked {
@@ -287,21 +298,14 @@ contract UroborusRouter {
 			}
 		}
 
-		if (!checkAmountOutMin(params, amounts, i)) {
-			// return revert if amountOut is insufficient
+		uint256 amountOutMinIdx = params.parts[i].amountOutMinIdx();
+		if (
+			amountOutMinIdx < params.amounts.length && amounts[i] < params.amounts[amountOutMinIdx]
+		) {
 			data = abi.encode(amounts);
 			assembly {
 				revert(add(data, 0x20), mload(data))
 			}
 		}
-	}
-
-	function checkAmountOutMin(
-		SwapParams calldata params,
-		uint256[] memory amounts,
-		uint256 partIdx
-	) internal pure returns (bool) {
-		uint256 idx = params.parts[partIdx].amountOutMinIdx();
-		return idx >= params.amounts.length || amounts[partIdx] >= params.amounts[idx];
 	}
 }

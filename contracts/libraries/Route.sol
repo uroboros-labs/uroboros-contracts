@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: No license
-pragma solidity >=0.8.15;
+pragma solidity >=0.8.17;
 
 library Route {
 	// struct RoutePart {
@@ -93,7 +93,11 @@ library Route {
 		}
 	}
 
-	function getReceiver(bytes memory route, uint256 index) internal pure returns (address receiver) {
+	function getReceiver(bytes memory route, uint256 index)
+		internal
+		pure
+		returns (address receiver)
+	{
 		uint256 oft = getOffset(route, index);
 		require(hasReceiver(route, index), "Route: no receiver");
 		assembly {
@@ -103,7 +107,11 @@ library Route {
 		}
 	}
 
-	function getAmountIn(bytes memory route, uint256 index) internal pure returns (address amountIn) {
+	function getAmountIn(bytes memory route, uint256 index)
+		internal
+		pure
+		returns (address amountIn)
+	{
 		uint256 oft = getOffset(route, index);
 		require(hasAmountIn(route, index), "Route: no amountIn");
 		assembly {
@@ -114,7 +122,11 @@ library Route {
 		}
 	}
 
-	function getProtocolId(bytes memory route, uint256 index) internal pure returns (address protocolId) {
+	function getProtocolId(bytes memory route, uint256 index)
+		internal
+		pure
+		returns (address protocolId)
+	{
 		uint256 oft = getOffset(route, index);
 		require(hasProtocolId(route, index), "Route: no protocolId");
 		assembly {

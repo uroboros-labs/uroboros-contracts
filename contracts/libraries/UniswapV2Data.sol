@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: No license
-pragma solidity >=0.8.15;
+pragma solidity >=0.8.17;
 
 library UniswapV2Data {
 	function checkData(bytes memory data) private pure {

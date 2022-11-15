@@ -143,14 +143,15 @@ describe("RouteExecutor", () => {
 			},
 		])
 		console.log(route)
-		let [amounts, skipMask] = await urbRouter.callStatic.swap({ ...route, deployer })
-		console.log(amounts)
-		console.log(skipMask)
+		let [amounts, skipMask, gasUsed] = await urbRouter.callStatic.swap({ ...route, deployer })
+		console.log("amounts:", amounts)
+		console.log("skipMask:", skipMask)
+		console.log("gasUsed:", gasUsed)
 		expect(amounts[0]).eq("3157881352671220601") // URB(1.0) -> SFM(3.15) ~ 1/4 + 20%
 		expect(amounts[1]).eq("365954187525228600") //
 	})
 
-	it("USDC -> SFM, invalid quote fee", async () => {
+	it("USDC->SFM, invalid quote fee", async () => {
 		let route = encodeRoute([
 			{
 				isInput: true,
@@ -169,16 +170,18 @@ describe("RouteExecutor", () => {
 				sectionId: 0,
 				sectionDepth: 0,
 				sectionEnd: 1,
+				isOutput: true,
 			},
 		])
 		console.log(route)
-		let [amounts, skipMask] = await urbRouter.callStatic.swap({ ...route, deployer })
-		console.log(amounts)
-		console.log(skipMask)
+		let [amounts, skipMask, gasUsed] = await urbRouter.callStatic.swap({ ...route, deployer })
+		console.log("amounts:", amounts)
+		console.log("skipMask:", skipMask)
+		console.log("gasUsed:", gasUsed)
 		expect(amounts[0]).eq("47835665340662188")
 	})
 
-	it("WETH -> USDC -> URB", async () => {
+	it("WETH->USDC->URB", async () => {
 		let route = encodeRoute([
 			{
 				amountIn: "10000000000000000",
@@ -211,12 +214,14 @@ describe("RouteExecutor", () => {
 				sectionId: 0,
 				sectionDepth: 0,
 				sectionEnd: 0,
+				isOutput: true,
 			},
 		])
 		console.log(route)
-		let [amounts, skip] = await urbRouter.callStatic.swap({ ...route, deployer })
-		console.log(amounts)
-		console.log(skip)
+		let [amounts, skipMask, gasUsed] = await urbRouter.callStatic.swap({ ...route, deployer })
+		console.log("amounts:", amounts)
+		console.log("skipMask:", skipMask)
+		console.log("gasUsed:", gasUsed)
 		expect(amounts[0]).eq("39872025157812017")
 		expect(amounts[1]).eq("19870261882150628")
 	})
@@ -244,6 +249,7 @@ describe("RouteExecutor", () => {
 				amountOutMin: "1000000000000000000",
 				tokenIn: WETH.address,
 				tokenOut: USDC.address,
+				isOutput: true,
 				swapData: {
 					type: "uniswap-v2",
 					address: wethUsdcPair15.address,
@@ -258,9 +264,10 @@ describe("RouteExecutor", () => {
 			},
 		])
 		console.log(route)
-		let [amounts, skip] = await urbRouter.callStatic.swap({ ...route, deployer })
-		console.log(amounts)
-		console.log(skip)
+		let [amounts, skipMask, gasUsed] = await urbRouter.callStatic.swap({ ...route, deployer })
+		console.log("amounts:", amounts)
+		console.log("skipMask:", skipMask)
+		console.log("gasUsed:", gasUsed)
 		expect(amounts[0]).eq("248605413159054346")
 		expect(amounts[1]).eq("1236110171506408603")
 	})
@@ -283,6 +290,7 @@ describe("RouteExecutor", () => {
 				sectionDepth: 1,
 				sectionEnd: 1,
 				isInput: true,
+				isOutput: true,
 			},
 			{
 				amountIn: "1000000000000000",
@@ -302,12 +310,14 @@ describe("RouteExecutor", () => {
 				sectionDepth: 1,
 				sectionEnd: 2,
 				isInput: true,
+				isOutput: true,
 			},
 		])
 		console.log(route)
-		let [amounts, skip] = await urbRouter.callStatic.swap({ ...route, deployer })
-		console.log(amounts)
-		console.log(skip)
+		let [amounts, skipMask, gasUsed] = await urbRouter.callStatic.swap({ ...route, deployer })
+		console.log("amounts:", amounts)
+		console.log("skipMask:", skipMask)
+		console.log("gasUsed:", gasUsed)
 		expect(amounts[0]).eq("3948239995485009935")
 		expect(amounts[1]).eq("1993780124005943")
 	})
@@ -337,6 +347,7 @@ describe("RouteExecutor", () => {
 				amountIn: "1974119997742504967",
 				tokenIn: USDC.address,
 				tokenOut: URB.address,
+				isOutput: true,
 				swapData: {
 					type: "uniswap-v2",
 					address: urbUsdcPair12.address,
@@ -352,6 +363,7 @@ describe("RouteExecutor", () => {
 			{
 				tokenIn: USDC.address,
 				tokenOut: WETH.address,
+				isOutput: true,
 				swapData: {
 					type: "uniswap-v2",
 					address: wethUsdcPair15.address,
@@ -367,9 +379,10 @@ describe("RouteExecutor", () => {
 		])
 		console.log(route)
 
-		let [amounts, skip] = await urbRouter.callStatic.swap({ ...route, deployer })
-		console.log(amounts)
-		console.log(skip)
+		let [amounts, skipMask, gasUsed] = await urbRouter.callStatic.swap({ ...route, deployer })
+		console.log("amounts:", amounts)
+		console.log("skipMask:", skipMask)
+		console.log("gasUsed:", gasUsed)
 		expect(amounts[0]).eq("3948239995485009935") // WETH(1) -> USDC(3.9) ~1/4
 		expect(amounts[1]).eq("974411898691759675") // USDC(1.9) -> URB(0.9) ~2/1
 		expect(amounts[2]).eq("392056908979145419") // USDC(1.9) -> WETH(0.39) ~1/5
@@ -429,6 +442,7 @@ describe("RouteExecutor", () => {
 			{
 				tokenIn: USDC.address,
 				tokenOut: BTC.address,
+				isOutput: true,
 				swapData: {
 					type: "uniswap-v2",
 					address: btcUsdcPair19.address,
@@ -444,10 +458,11 @@ describe("RouteExecutor", () => {
 		])
 		console.log(route)
 
-		let [amounts, skip] = await urbRouter.callStatic.swap({ ...route, deployer })
-		console.log(amounts)
-		console.log(skip)
-		expect(skip).eq(2) // section 1 skipped
+		let [amounts, skipMask, gasUsed] = await urbRouter.callStatic.swap({ ...route, deployer })
+		console.log("amounts:", amounts)
+		console.log("skipMask:", skipMask)
+		console.log("gasUsed:", gasUsed)
+		expect(skipMask).eq(2) // section 1 skipped
 		expect(amounts[0]).eq("1974119997742504967")
 		expect(amounts[1]).eq("489591267126799483")
 		expect(amounts[2]).eq("2428514733306148412") // <amountOutMin
@@ -507,6 +522,7 @@ describe("RouteExecutor", () => {
 			{
 				tokenIn: USDC.address,
 				tokenOut: BTC.address,
+				isOutput: true,
 				swapData: {
 					type: "uniswap-v2",
 					address: btcUsdcPair19.address,
@@ -523,6 +539,7 @@ describe("RouteExecutor", () => {
 				// amountIn: "244795633563399742",
 				tokenIn: WETH.address,
 				tokenOut: BTC.address,
+				isOutput: true,
 				swapData: {
 					type: "uniswap-v2",
 					address: btcWethPair17.address,
@@ -536,9 +553,10 @@ describe("RouteExecutor", () => {
 				sectionEnd: 5,
 			},
 		])
-		let [amounts, skipMask] = await urbRouter.callStatic.swap({ ...route, deployer })
-		console.log(amounts)
-		console.log(skipMask)
+		let [amounts, skipMask, gasUsed] = await urbRouter.callStatic.swap({ ...route, deployer })
+		console.log("amounts:", amounts)
+		console.log("skipMask:", skipMask)
+		console.log("gasUsed:", gasUsed)
 		expect(amounts[0]).eq("1974119997742504967") // URB(1) -> USDC(1.9) ~ 1/2
 		expect(amounts[1]).eq("489591267126799483") // USDC(1.9) -> WETH(0.48) ~ 4/1
 		expect(amounts[2]).eq("1217213387297704158") // WETH(0.24) -> USDC(1.2) ~ 1/5

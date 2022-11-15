@@ -56,7 +56,10 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 		uint256 value
 	) private {
 		(bool success, bytes memory data) = token.call(abi.encodeWithSelector(SELECTOR, to, value));
-		require(success && (data.length == 0 || abi.decode(data, (bool))), "UniswapV2: TRANSFER_FAILED");
+		require(
+			success && (data.length == 0 || abi.decode(data, (bool))),
+			"UniswapV2: TRANSFER_FAILED"
+		);
 	}
 
 	// called once by the factory at time of deployment
@@ -78,8 +81,12 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 		uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
 		if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
 			// * never overflows, and + overflow is desired
-			price0CumulativeLast += uint256(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) * timeElapsed;
-			price1CumulativeLast += uint256(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) * timeElapsed;
+			price0CumulativeLast +=
+				uint256(UQ112x112.encode(_reserve1).uqdiv(_reserve0)) *
+				timeElapsed;
+			price1CumulativeLast +=
+				uint256(UQ112x112.encode(_reserve0).uqdiv(_reserve1)) *
+				timeElapsed;
 		}
 		reserve0 = uint112(balance0);
 		reserve1 = uint112(balance1);
@@ -122,7 +129,10 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 			liquidity = Math.sqrt(amount0.mul(amount1)).sub(MINIMUM_LIQUIDITY);
 			_mint(address(0), MINIMUM_LIQUIDITY); // permanently lock the first MINIMUM_LIQUIDITY tokens
 		} else {
-			liquidity = Math.min(amount0.mul(_totalSupply) / _reserve0, amount1.mul(_totalSupply) / _reserve1);
+			liquidity = Math.min(
+				amount0.mul(_totalSupply) / _reserve0,
+				amount1.mul(_totalSupply) / _reserve1
+			);
 		}
 		require(liquidity > 0, "UniswapV2: INSUFFICIENT_LIQUIDITY_MINTED");
 		_mint(to, liquidity);
@@ -166,7 +176,10 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 	) external lock {
 		require(amount0Out > 0 || amount1Out > 0, "UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT");
 		(uint112 _reserve0, uint112 _reserve1, ) = getReserves(); // gas savings
-		require(amount0Out < _reserve0 && amount1Out < _reserve1, "UniswapV2: INSUFFICIENT_LIQUIDITY");
+		require(
+			amount0Out < _reserve0 && amount1Out < _reserve1,
+			"UniswapV2: INSUFFICIENT_LIQUIDITY"
+		);
 
 		uint256 balance0;
 		uint256 balance1;
@@ -177,19 +190,25 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 			require(to != _token0 && to != _token1, "UniswapV2: INVALID_TO");
 			if (amount0Out > 0) _safeTransfer(_token0, to, amount0Out); // optimistically transfer tokens
 			if (amount1Out > 0) _safeTransfer(_token1, to, amount1Out); // optimistically transfer tokens
-			if (data.length > 0) IUniswapV2Callee(to).uniswapV2Call(msg.sender, amount0Out, amount1Out, data);
+			if (data.length > 0)
+				IUniswapV2Callee(to).uniswapV2Call(msg.sender, amount0Out, amount1Out, data);
 			balance0 = IERC20(_token0).balanceOf(address(this));
 			balance1 = IERC20(_token1).balanceOf(address(this));
 		}
-		uint256 amount0In = balance0 > _reserve0 - amount0Out ? balance0 - (_reserve0 - amount0Out) : 0;
-		uint256 amount1In = balance1 > _reserve1 - amount1Out ? balance1 - (_reserve1 - amount1Out) : 0;
+		uint256 amount0In = balance0 > _reserve0 - amount0Out
+			? balance0 - (_reserve0 - amount0Out)
+			: 0;
+		uint256 amount1In = balance1 > _reserve1 - amount1Out
+			? balance1 - (_reserve1 - amount1Out)
+			: 0;
 		require(amount0In > 0 || amount1In > 0, "UniswapV2: INSUFFICIENT_INPUT_AMOUNT");
 		{
 			// scope for reserve{0,1}Adjusted, avoids stack too deep errors
 			uint256 balance0Adjusted = balance0.mul(1000).sub(amount0In.mul(3));
 			uint256 balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
 			require(
-				balance0Adjusted.mul(balance1Adjusted) >= uint256(_reserve0).mul(_reserve1).mul(1000**2),
+				balance0Adjusted.mul(balance1Adjusted) >=
+					uint256(_reserve0).mul(_reserve1).mul(1000**2),
 				"UniswapV2: K"
 			);
 		}
@@ -208,6 +227,11 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 
 	// force reserves to match balances
 	function sync() external lock {
-		_update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)), reserve0, reserve1);
+		_update(
+			IERC20(token0).balanceOf(address(this)),
+			IERC20(token1).balanceOf(address(this)),
+			reserve0,
+			reserve1
+		);
 	}
 }

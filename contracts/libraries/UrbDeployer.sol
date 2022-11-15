@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: No license
-pragma solidity >=0.8.15;
+pragma solidity >=0.8.17;
 
 import "hardhat/console.sol";
 import "./Hex.sol";
@@ -19,6 +19,6 @@ library UrbDeployer {
 			mstore(ptr, 0x0) // clear memory
 		}
 		// console.log("value: %s", Hex.toHex(value));
-		require(addr.code.length != 0, "UrbDeployer: adaptor not deployed");
+		require(addr.code.length != 0, "UrbDeployer: contract not deployed");
 	}
 }

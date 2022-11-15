@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: No license
-pragma solidity >=0.8.15;
+pragma solidity >=0.8.17;
 
 library Address {
 	function compute(address _origin, uint256 _nonce) internal pure returns (address _address) {

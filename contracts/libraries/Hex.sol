@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: No license
-pragma solidity >=0.8.15;
+pragma solidity >=0.8.17;
 
 library Hex {
 	function toHex(uint256 value) internal pure returns (string memory) {

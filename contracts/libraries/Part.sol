@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: No license
-pragma solidity >=0.8.15;
+pragma solidity >=0.8.17;
 
 import "./UrbDeployer.sol";
 
@@ -83,6 +83,10 @@ library Part {
 	// function tokenInLastUsedIdx(uint256 self) internal pure returns (uint256) {
 	// 	return (self >> 0x68) & 0xff;
 	// }
+
+	function isOutput(uint256 self) internal pure returns (bool) {
+		return (self >> 0x68) & 0x1 != 0x0;
+	}
 
 	function getAdaptor(uint256 self, address deployer) internal view returns (address) {
 		return UrbDeployer.getAddress(deployer, adaptorId(self));

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: No license
-pragma solidity >=0.8.15;
+pragma solidity >=0.8.17;
 
 library BitMap {
 	function set(uint256 self, uint256 bit) internal pure returns (uint256) {
