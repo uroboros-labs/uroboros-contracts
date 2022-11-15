@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: No license
 pragma solidity >=0.8.15;
 
-import "./interfaces/IAdaptor.sol";
+import "../common/libraries/math/Math.sol";
+import "../common/libraries/RevertReasonParser.sol";
+import "../common/libraries/Bitmap.sol";
+import "../common/libraries/Strings2.sol";
+
 import "./libraries/UrbERC20.sol";
-import "./libraries/RevertReasonParser.sol";
 import "./libraries/Part.sol";
-import "./libraries/Bitmap.sol";
-import "./libraries/Math.sol";
-import "./libraries/Strings2.sol";
+
+import "./interfaces/IAdaptor.sol";
 
 import "hardhat/console.sol";
 
 /// @title Uroborus Router
 /// @author maksfourlife
-contract UroborusRouter {
+contract UrbRouter {
 	using Part for uint256;
 	using UrbDeployer for address;
 	using UrbERC20 for IERC20;

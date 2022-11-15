@@ -2,11 +2,14 @@
 pragma solidity >=0.8.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import "../common/libraries/math/UQ112x112.sol";
+import "../common/libraries/math/Math.sol";
+
 import "./interfaces/IUniswapV2Pair.sol";
 import "./interfaces/IUniswapV2Factory.sol";
 import "./interfaces/IUniswapV2Callee.sol";
-import "./libraries/UQ112x112.sol";
-import "./libraries/Math.sol";
+
 import "./UniswapV2ERC20.sol";
 
 contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {

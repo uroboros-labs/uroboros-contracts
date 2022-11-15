@@ -6,7 +6,7 @@ import {
 	ERC20TransferFee,
 	UniswapV2Adaptor,
 	UniswapV2Pair,
-	UroborusRouter,
+	UrbRouter,
 } from "../typechain-types"
 import { createUniswapV2Pair, encodeRoute, getZeroForOne } from "./utils"
 
@@ -23,7 +23,7 @@ let deployer: string,
 	btcUsdcPair19: UniswapV2Pair,
 	usdcSfmPair16: UniswapV2Pair,
 	urbSfmPair14: UniswapV2Pair,
-	urbRouter: UroborusRouter,
+	urbRouter: UrbRouter,
 	uniswapV2Adaptor: UniswapV2Adaptor
 
 describe("RouteExecutor", () => {
@@ -32,11 +32,11 @@ describe("RouteExecutor", () => {
 		deployer = signer.address
 		console.log("deployer:", deployer)
 
-		let [ERC20PresetFixedSupply, UniswapV2Adaptor, UroborosRouter, ERC20TransferFee] =
+		let [ERC20PresetFixedSupply, UniswapV2Adaptor, UrbRouter, ERC20TransferFee] =
 			await Promise.all([
 				ethers.getContractFactory("ERC20PresetFixedSupply"),
 				ethers.getContractFactory("UniswapV2Adaptor"),
-				ethers.getContractFactory("UroborusRouter"),
+				ethers.getContractFactory("UrbRouter"),
 				ethers.getContractFactory("ERC20TransferFee"),
 			])
 
@@ -74,7 +74,7 @@ describe("RouteExecutor", () => {
 			ERC20TransferFee.deploy("SAFEMOON", "SFM", "100000000000000000000000"),
 		])
 
-		urbRouter = await UroborosRouter.deploy()
+		urbRouter = await UrbRouter.deploy()
 		;[
 			wethUsdcPair14,
 			wethUsdcPair15,

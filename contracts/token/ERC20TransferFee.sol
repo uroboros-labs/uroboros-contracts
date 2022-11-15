@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "./libraries/Fee.sol";
+import "../common/libraries/Fee.sol";
 
 import "hardhat/console.sol";
 

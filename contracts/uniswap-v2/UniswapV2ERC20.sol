@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: No license
 pragma solidity >=0.8.17;
 
+import "../common/libraries/math/SafeMath.sol";
+
 import "./interfaces/IUniswapV2ERC20.sol";
-import "./libraries/SafeMath.sol";
 
 contract UniswapV2ERC20 is IUniswapV2ERC20 {
 	using SafeMath for uint256;
