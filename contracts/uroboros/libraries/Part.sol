@@ -76,6 +76,7 @@ library Part {
 		return (self >> 0x70) & 0x1 != 0x0;
 	}
 
+	/// Specifies if output token will be transferred to sender
 	function isOutput(uint256 self) internal pure returns (bool) {
 		return (self >> 0x78) & 0x1 != 0x0;
 	}

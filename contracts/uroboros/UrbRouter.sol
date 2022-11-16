@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: No license
 pragma solidity >=0.8.17;
 
+import "../common/RescueFunds.sol";
 import "../common/libraries/math/Math.sol";
 import "../common/libraries/SafeCast.sol";
 import "../common/libraries/RevertReasonParser.sol";
@@ -16,7 +17,7 @@ import "./interfaces/IAdaptor.sol";
 
 import "hardhat/console.sol";
 
-contract UrbRouter {
+contract UrbRouter is RescueFunds {
 	using UrbDeployer for address;
 
 	using UrbERC20 for IERC20;
@@ -72,7 +73,7 @@ contract UrbRouter {
 				numTokens = Math.max(numTokens, tokenOutId);
 			}
 			for (uint256 i; i <= numTokens; i++) {
-				address token = params.data.valueAt(i.toPtr()).toLeAddress();
+				address token = params.data.valueAt(i.toTokenPtr()).toLeAddress();
 				uint256 balance = IERC20(token).selfBalance();
 				if (balance.isZero()) {
 					IERC20(token).safeTransfer(msg.sender, balance);
@@ -130,7 +131,7 @@ contract UrbRouter {
 				console.log("tokenInId: %s", tokenInId);
 				// require(tokenInPtr < tokenAmounts.length, "UrbRouter: token index out of bounds");
 				// tokenIn = params.tokens[tokenInIdx];
-				tokenIn = params.data.valueAt(tokenInId.toPtr()).toLeAddress();
+				tokenIn = params.data.valueAt(tokenInId.toTokenPtr()).toLeAddress();
 				console.log("tokenIn: %s", tokenIn);
 
 				bool success;
@@ -268,10 +269,10 @@ contract UrbRouter {
 			// scope for balance, {token,amount}InIdx
 			uint256 tokenInId = params.parts[i].tokenInId();
 			// require(tokenInIdx < params.tokens.length, "UrbRouter: token index out of bounds");
-			tokenIn = params.data.valueAt(tokenInId.toPtr()).toLeAddress();
+			tokenIn = params.data.valueAt(tokenInId.toTokenPtr()).toLeAddress();
 
-			uint256 amountInPtr = params.parts[i].amountInPtr();
 			uint256 balance = IERC20(tokenIn).selfBalance();
+			uint256 amountInPtr = params.parts[i].amountInPtr();
 			if (amountInPtr.isZero()) {
 				amountIn = balance;
 			} else {
@@ -290,7 +291,7 @@ contract UrbRouter {
 			// scope for tokenOutIdx
 			uint256 tokenOutId = params.parts[i].tokenOutId();
 			// require(tokenOutIdx < params.tokens.length, "UrbRouter: token index out of bounds");
-			tokenOut = params.data.valueAt(tokenOutId.toPtr()).toLeAddress();
+			tokenOut = params.data.valueAt(tokenOutId.toTokenPtr()).toLeAddress();
 		}
 
 		address adaptor = UrbDeployer.getAddress(params.deployer, params.parts[i].adaptorId());
