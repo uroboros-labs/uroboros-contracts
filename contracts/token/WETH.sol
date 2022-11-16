@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: No license
 pragma solidity >=0.8.17;
 
-import {IWETH} from "./interfaces/IWETH.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
+
+import "./interfaces/IWETH.sol";
 
 contract WETH is ERC20, IWETH {
 	constructor(string memory name, string memory symbol) ERC20(name, symbol) {}

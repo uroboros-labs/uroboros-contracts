@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: No license
 pragma solidity >=0.8.17;
 
-import "./interfaces/IAdaptor.sol";
-import "./interfaces/IUniswapV2Pair.sol";
-import "./libraries/Fee.sol";
-import "./libraries/UniswapV2Data.sol";
+import "../../uniswap-v2/interfaces/IUniswapV2Pair.sol";
+import "../../common/libraries/Fee.sol";
+import "../../common/libraries/Hex.sol";
+
+import "../libraries/UniswapV2Data.sol";
+
+import "../interfaces/IAdaptor.sol";
 
 contract UniswapV2Adaptor is IAdaptor {
 	using Fee for uint256;

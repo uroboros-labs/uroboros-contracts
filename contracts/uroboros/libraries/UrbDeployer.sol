@@ -12,7 +12,7 @@ library UrbDeployer {
 			let ptr := mload(0x40)
 			mstore(ptr, value)
 			addr := keccak256(add(ptr, 0x9), 0x17)
-			mstore(ptr, 0x0) // clear memory
+			mstore(ptr, 0x0)
 		}
 		require(addr.code.length != 0, "UrbDeployer: contract not deployed");
 	}

@@ -5,9 +5,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import "./libraries/Fee.sol";
+import "../common/libraries/Fee.sol";
 
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 contract ERC20TransferFee is Ownable, IERC20, IERC20Metadata {
 	using Fee for uint256;
@@ -69,9 +69,9 @@ contract ERC20TransferFee is Ownable, IERC20, IERC20Metadata {
 			balanceOf[owner] -= amount;
 		}
 		uint256 totalFee = _transferFromFee.mul(_transferToFee);
-		console.log("totalFee: %s", totalFee);
+		// console.log("totalFee: %s", totalFee);
 		amount = totalFee.getAmountLessFee(amount);
-		console.log("amountLessFee: %s", amount);
+		// console.log("amountLessFee: %s", amount);
 		balanceOf[to] += amount;
 		emit Transfer(owner, to, amount);
 	}
