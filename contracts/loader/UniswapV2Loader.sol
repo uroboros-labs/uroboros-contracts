@@ -3,12 +3,15 @@ pragma solidity >=0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/proxy/Proxy.sol";
+
 import "../uniswap-v2/interfaces/IUniswapV2Pair.sol";
-import "../uniswap-v2/UniswapV2Pair.sol";
 import "../common/libraries/RevertReasonParser.sol";
+
 import "./libraries/Wrapper.sol";
 import "./libraries/FeeERC20.sol";
+import "./libraries/Iterator.sol";
 import "./Relay.sol";
+
 import "hardhat/console.sol";
 
 /// Loads UniswapV2 pair
@@ -19,14 +22,16 @@ contract UniswapV2Loader is Proxy {
 	using SafeERC20 for IERC20;
 	using FeeERC20 for IERC20;
 	using Fee for uint;
+	using Iterator for bytes;
+	using Iterator for Iterator.It;
 
 	Relay immutable relay;
-	UniswapV2Pair immutable __pair;
+	address immutable __pair;
 
 	uint constant SWAP_FEE_STEP = 5;
 	uint constant SWAP_FEE_MAX = 100;
 
-	constructor(Relay _relay, UniswapV2Pair pair) {
+	constructor(Relay _relay, address pair) {
 		relay = _relay;
 		__pair = pair;
 		assembly {
@@ -35,20 +40,20 @@ contract UniswapV2Loader is Proxy {
 	}
 
 	function _implementation() internal view override returns (address) {
-		return address(__pair);
+		return __pair;
 	}
 
 	struct Data {
-		string name;
-		uint[2] reserves;
-		address[2] tokens;
-		uint swapFee;
-		uint[2] gas;
-		uint[2] buyFee;
-		uint[2] sellFee;
+		string name; // 8 + length
+		uint[2] reserves; // 32*2=64 -> 64+8+length=72+length
+		address[2] tokens; // 20*2=40 -> 40+72+length=112+length
+		uint swapFee; // 2 -> 114+length
+		uint[2] gas; // 8*2=16 -> 130+length
+		uint[2] buyFee; // 2*2=4 -> 134+length
+		uint[2] sellFee; // 2*2=4 -> 138+length
 	}
 
-	function load(address pair) external returns (Data memory data) {
+	function load(address pair) public returns (Data memory data) {
 		// globally set wrapper to point to pair
 		Wrapper.set(pair);
 
@@ -91,18 +96,18 @@ contract UniswapV2Loader is Proxy {
 		// uint sellFee,
 		uint swapFee
 	) internal returns (uint, uint) {
-		tokenIn.safeTransfer(address(relay), (tokenIn.balanceOf(address(this)) / 3) * 2);
+		tokenIn.safeTransfer(address(relay), (tokenIn.balanceOf(address(this)) / 10) * 9);
 		Wrapper.sync();
 		(uint reserveOut, uint reserveIn, ) = Wrapper.getReserves();
 		if (zeroForOne) {
 			(reserveIn, reserveOut) = (reserveOut, reserveIn);
 		}
 
-		console.log("preSwap:: reserveIn: %s, reserveOut: %s", reserveIn, reserveOut);
+		// console.log("preSwap:: reserveIn: %s, reserveOut: %s", reserveIn, reserveOut);
 		(, uint amountIn) = relay.transferAllGetFee(tokenIn, address(this));
 		// dont know why, but this better be commented
 		// amountIn = sellFee.getAmountLessFee(amountIn);
-		console.log("amountIn: %s", amountIn);
+		// console.log("amountIn: %s", amountIn);
 
 		for (; swapFee < SWAP_FEE_MAX; swapFee += SWAP_FEE_STEP) {
 			uint amount0Out = _getAmountOut(amountIn, reserveIn, reserveOut, swapFee);
@@ -118,13 +123,13 @@ contract UniswapV2Loader is Proxy {
 				relay.transferAllGetFee(tokenOut, address(this));
 				Wrapper.sync();
 
-				console.log("swapFee: %s", swapFee);
+				// console.log("swapFee: %s", swapFee);
 
 				(reserveIn, reserveOut, ) = Wrapper.getReserves();
-				console.log("postSwap:: reserveIn: %s, reserveOut: %s", reserveIn, reserveOut);
+				// console.log("postSwap:: reserveIn: %s, reserveOut: %s", reserveIn, reserveOut);
 
 				return (swapFee, gas - gasleft());
-			} catch Error(string memory reason) {
+			} catch {
 				// console.log("error: %s", reason);
 			}
 		}
@@ -141,9 +146,35 @@ contract UniswapV2Loader is Proxy {
 		uint reserveIn,
 		uint reserveOut,
 		uint swapFee
-	) internal view returns (uint) {
+	) internal pure returns (uint) {
 		amountIn = swapFee.getAmountLessFee(amountIn);
-		console.log("amountInLessFee: %s", amountIn);
+		// console.log("amountInLessFee: %s", amountIn);
 		return (amountIn * reserveOut) / (amountIn + reserveIn);
+	}
+
+	function loadRaw(address pair) external returns (bytes memory rawData) {
+		Data memory data = load(pair);
+		uint nameLength = bytes(data.name).length;
+		rawData = new bytes(138 + nameLength);
+		Iterator.It memory it = rawData.iter();
+
+		it.writeUint(uint64(nameLength), 64);
+		it.writeString(data.name);
+
+		it.writeUint(data.reserves[0], 256);
+		it.writeUint(data.reserves[1], 256);
+
+		it.writeAddress(data.tokens[0]);
+		it.writeAddress(data.tokens[1]);
+
+		it.writeUint(data.swapFee, 8);
+
+		it.writeUint(data.gas[0], 64);
+		it.writeUint(data.gas[1], 64);
+
+		it.writeUint(data.buyFee[0], 16);
+		it.writeUint(data.buyFee[1], 16);
+		it.writeUint(data.sellFee[0], 16);
+		it.writeUint(data.sellFee[1], 16);
 	}
 }

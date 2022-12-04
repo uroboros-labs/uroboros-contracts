@@ -42,6 +42,6 @@ describe("UniswapV2", () => {
 	})
 
 	it("works", async () => {
-		console.log(await loader.callStatic.load(pairImpl.address))
+		console.log(await loader.callStatic.loadRaw(pairImpl.address))
 	})
 })
