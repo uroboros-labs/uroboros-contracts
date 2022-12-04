@@ -12,11 +12,13 @@ import "./interfaces/IUniswapV2Callee.sol";
 
 import "./UniswapV2ERC20.sol";
 
+import "hardhat/console.sol";
+
 contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 	using SafeMath for uint256;
 	using UQ112x112 for uint224;
 
-	uint256 public constant MINIMUM_LIQUIDITY = 10**3;
+	uint256 public constant MINIMUM_LIQUIDITY = 10 ** 3;
 	bytes4 private constant SELECTOR = bytes4(keccak256(bytes("transfer(address,uint256)")));
 
 	address public immutable factory = msg.sender;
@@ -39,25 +41,25 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 		unlocked = 1;
 	}
 
+	// constructor() {
+	// 	uint slot;
+	// 	assembly {
+	// 		slot := unlocked.slot
+	// 	}
+	// 	console.log("slot: %s", slot);
+	// }
+
 	function getReserves()
 		public
 		view
-		returns (
-			uint112 _reserve0,
-			uint112 _reserve1,
-			uint32 _blockTimestampLast
-		)
+		returns (uint112 _reserve0, uint112 _reserve1, uint32 _blockTimestampLast)
 	{
 		_reserve0 = reserve0;
 		_reserve1 = reserve1;
 		_blockTimestampLast = blockTimestampLast;
 	}
 
-	function _safeTransfer(
-		address token,
-		address to,
-		uint256 value
-	) private {
+	function _safeTransfer(address token, address to, uint256 value) private {
 		(bool success, bytes memory data) = token.call(abi.encodeWithSelector(SELECTOR, to, value));
 		require(
 			success && (data.length == 0 || abi.decode(data, (bool))),
@@ -80,7 +82,7 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 		uint112 _reserve1
 	) private {
 		require(balance0 <= ~uint256(0) && balance1 <= ~uint256(0), "UniswapV2: OVERFLOW");
-		uint32 blockTimestamp = uint32(block.timestamp % 2**32);
+		uint32 blockTimestamp = uint32(block.timestamp % 2 ** 32);
 		uint32 timeElapsed = blockTimestamp - blockTimestampLast; // overflow is desired
 		if (timeElapsed > 0 && _reserve0 != 0 && _reserve1 != 0) {
 			// * never overflows, and + overflow is desired
@@ -204,6 +206,8 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 		uint256 amount1In = balance1 > _reserve1 - amount1Out
 			? balance1 - (_reserve1 - amount1Out)
 			: 0;
+		console.log("amount0In: %s, amount1In: %s", amount0In, amount1In);
+		console.log("amount0Out: %s, amount1Out: %s", amount0Out, amount1Out);
 		require(amount0In > 0 || amount1In > 0, "UniswapV2: INSUFFICIENT_INPUT_AMOUNT");
 		{
 			// scope for reserve{0,1}Adjusted, avoids stack too deep errors
@@ -211,7 +215,7 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 			uint256 balance1Adjusted = balance1.mul(1000).sub(amount1In.mul(3));
 			require(
 				balance0Adjusted.mul(balance1Adjusted) >=
-					uint256(_reserve0).mul(_reserve1).mul(1000**2),
+					uint256(_reserve0).mul(_reserve1).mul(1000 ** 2),
 				"UniswapV2: K"
 			);
 		}

@@ -26,11 +26,7 @@ contract ERC20TransferFee is Ownable, IERC20, IERC20Metadata {
 	event TransferToFeeUpdated(address indexed to, uint256 fee);
 	event TransferFromFeeUpdated(address indexed from, uint256 fee);
 
-	constructor(
-		string memory _name,
-		string memory _symbol,
-		uint256 initalSupply
-	) {
+	constructor(string memory _name, string memory _symbol, uint256 initalSupply) {
 		name = _name;
 		symbol = _symbol;
 		totalSupply = initalSupply;
@@ -57,11 +53,7 @@ contract ERC20TransferFee is Ownable, IERC20, IERC20Metadata {
 		emit Transfer(address(0x0), to, amount);
 	}
 
-	function _transfer(
-		address owner,
-		address to,
-		uint256 amount
-	) internal {
+	function _transfer(address owner, address to, uint256 amount) internal {
 		require(balanceOf[owner] >= amount, "ERC20TransferFee: insufficient balance");
 		uint256 _transferFromFee = transferFromFee[owner];
 		uint256 _transferToFee = transferToFee[to];
@@ -81,11 +73,7 @@ contract ERC20TransferFee is Ownable, IERC20, IERC20Metadata {
 		return true;
 	}
 
-	function transferFrom(
-		address from,
-		address to,
-		uint256 amount
-	) external returns (bool) {
+	function transferFrom(address from, address to, uint256 amount) external returns (bool) {
 		require(allowance[from][msg.sender] >= amount, "ERC20TransferFee: insufficient allowance");
 		unchecked {
 			allowance[from][msg.sender] -= amount;
