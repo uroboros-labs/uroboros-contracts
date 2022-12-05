@@ -47,10 +47,10 @@ contract UniswapV2Loader is Proxy {
 		string name; // 8 + length
 		uint[2] reserves; // 32*2=64 -> 64+8+length=72+length
 		address[2] tokens; // 20*2=40 -> 40+72+length=112+length
-		uint swapFee; // 2 -> 114+length
-		uint[2] gas; // 8*2=16 -> 130+length
-		uint[2] buyFee; // 2*2=4 -> 134+length
-		uint[2] sellFee; // 2*2=4 -> 138+length
+		uint swapFee; // 1 -> 113+length
+		uint[2] gas; // 8*2=16 -> 129+length
+		uint[2] buyFee; // 2*2=4 -> 133+length
+		uint[2] sellFee; // 2*2=4 -> 137+length
 	}
 
 	function load(address pair) public returns (Data memory data) {
@@ -152,10 +152,16 @@ contract UniswapV2Loader is Proxy {
 		return (amountIn * reserveOut) / (amountIn + reserveIn);
 	}
 
+	function reverseBytes(uint x) internal returns (uint y) {
+		for (uint i; i < 32; i++) {
+			y |= (x) & 0xff;
+		}
+	}
+
 	function loadRaw(address pair) external returns (bytes memory rawData) {
 		Data memory data = load(pair);
 		uint nameLength = bytes(data.name).length;
-		rawData = new bytes(138 + nameLength);
+		rawData = new bytes(137 + nameLength);
 		Iterator.It memory it = rawData.iter();
 
 		it.writeUint(uint64(nameLength), 64);
