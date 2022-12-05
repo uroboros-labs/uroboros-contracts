@@ -206,8 +206,6 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
 		uint256 amount1In = balance1 > _reserve1 - amount1Out
 			? balance1 - (_reserve1 - amount1Out)
 			: 0;
-		console.log("amount0In: %s, amount1In: %s", amount0In, amount1In);
-		console.log("amount0Out: %s, amount1Out: %s", amount0Out, amount1Out);
 		require(amount0In > 0 || amount1In > 0, "UniswapV2: INSUFFICIENT_INPUT_AMOUNT");
 		{
 			// scope for reserve{0,1}Adjusted, avoids stack too deep errors

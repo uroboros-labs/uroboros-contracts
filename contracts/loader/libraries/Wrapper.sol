@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: No license
 pragma solidity >=0.8.17;
 
+/// Contains common method declarations as external methods (called via 'delegatecall')
+/// and delegates them to stored implementation
 library Wrapper {
 	bytes32 constant IMPL_SLOT = keccak256("IMPL_SLOT");
 
+	/// sets current implementation to forward methods
 	function set(address impl) external {
 		bytes32 slot = IMPL_SLOT;
 		assembly {
@@ -14,18 +17,18 @@ library Wrapper {
 	function delegate() private {
 		bytes32 slot = IMPL_SLOT;
 		assembly {
-			let impl := sload(slot)
+			let addr := sload(slot)
 			let size := calldatasize()
-			calldatacopy(0, 0, size)
-			let ok := delegatecall(gas(), impl, 0, size, 0, 0)
+			calldatacopy(0x0, 0x0, size)
+			let ok := delegatecall(gas(), addr, 0x0, size, 0x0, 0x0)
 			size := returndatasize()
-			returndatacopy(0, 0, size)
+			returndatacopy(0x0, 0x0, size)
 			switch ok
-			case 0 {
-				revert(0, size)
+			case 0x0 {
+				revert(0x0, size)
 			}
-			case 1 {
-				return(0, size)
+			case 0x1 {
+				return(0x0, size)
 			}
 		}
 	}
