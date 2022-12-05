@@ -24,6 +24,6 @@ library Fee {
 	}
 
 	function mul(uint256 fee1, uint256 fee2) internal pure returns (uint256) {
-		return (MAX * (fee1 + fee2) - fee1 * fee2) / MAX;
+		return (MAX * (fee1 + fee2) - fee1 * fee2) / MAX + 1;
 	}
 }
