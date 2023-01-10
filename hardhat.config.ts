@@ -14,18 +14,18 @@ const config: HardhatUserConfig = {
 		},
 	},
 	networks: {
-		hardhat: {
-			forking: {
-				blockNumber: 24068564,
-				url: "https://rpc.ankr.com/bsc",
-			},
-			accounts: [
-				{
-					privateKey: "8b248efef2761fdc4f0cd11fc9d6d21951bcdbfa53bcadd55a6ae19cf8909a3b",
-					balance: "1000000000000000000",
-				},
-			],
-		},
+		// hardhat: {
+		// 	forking: {
+		// 		blockNumber: 24068564,
+		// 		url: "https://rpc.ankr.com/bsc",
+		// 	},
+		// 	accounts: [
+		// 		{
+		// 			privateKey: "8b248efef2761fdc4f0cd11fc9d6d21951bcdbfa53bcadd55a6ae19cf8909a3b",
+		// 			balance: "1000000000000000000",
+		// 		},
+		// 	],
+		// },
 	},
 }
 

@@ -2,8 +2,12 @@
 pragma solidity >=0.8.17;
 
 library UniswapV2Data {
+	error InvalidDataLength();
+
 	function checkData(bytes memory data) private pure {
-		require(data.length == 26, "UniswapV2Adapter: invalid data length");
+		if (data.length != 26) {
+			revert InvalidDataLength();
+		}
 	}
 
 	function pairAddress(bytes memory data) internal pure returns (address x) {
