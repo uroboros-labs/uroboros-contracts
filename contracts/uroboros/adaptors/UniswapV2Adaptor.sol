@@ -20,10 +20,12 @@ contract UniswapV2Adaptor is IAdaptor {
 	error ZeroInput();
 
 	function quote(address, uint256 amountIn, bytes memory data) public view returns (uint256) {
+		data.check();
 		return data.buyFee().getAmountLessFee(_quote(data.pairAddress(), amountIn, data));
 	}
 
 	function swap(address tokenIn, uint256 amountIn, bytes memory data, address to) public payable {
+		data.check();
 		address addr = data.pairAddress();
 		uint256 amount0Out = _quote(addr, amountIn, data);
 		uint256 amount1Out;
@@ -31,21 +33,10 @@ contract UniswapV2Adaptor is IAdaptor {
 			(amount0Out, amount1Out) = (amount1Out, amount0Out);
 		}
 		IERC20(tokenIn).transfer(addr, amountIn);
-		// console.log("zeroForOne: %s", data.zeroForOne());
-		// console.log(
-		// 	"amountIn: %s, amount0Out: %s, amount1Out: %s",
-		// 	amountIn,
-		// 	amount0Out,
-		// 	amount1Out
-		// );
 		IUniswapV2Pair(addr).swap(amount0Out, amount1Out, to, "");
 	}
 
-	function _quote(
-		address addr,
-		uint256 amountIn,
-		bytes memory data
-	) internal view returns (uint256) {
+	function _quote(address addr, uint256 amountIn, bytes memory data) internal view returns (uint256) {
 		(uint112 reserveOut, uint112 reserveIn, ) = IUniswapV2Pair(addr).getReserves();
 		if (data.zeroForOne()) {
 			(reserveIn, reserveOut) = (reserveOut, reserveIn);
@@ -55,11 +46,7 @@ contract UniswapV2Adaptor is IAdaptor {
 		return amountOut;
 	}
 
-	function getAmountOut(
-		uint256 amountIn,
-		uint256 reserveIn,
-		uint256 reserveOut
-	) internal pure returns (uint256) {
+	function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) internal pure returns (uint256) {
 		if (amountIn.isZero()) {
 			revert ZeroInput();
 		}

@@ -15,7 +15,7 @@
 		{
 			"files": "**/*.sol",
 			"options": {
-				"printWidth": 100
+				"compiler": "0.8.17"
 			}
 		}
 	]

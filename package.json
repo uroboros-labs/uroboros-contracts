@@ -21,6 +21,7 @@
 		"web3-utils": "^1.8.1"
 	},
 	"dependencies": {
+		"prettier-plugin-solidity": "^1.1.1",
 		"web3-eth-abi": "^1.8.0"
 	}
 }

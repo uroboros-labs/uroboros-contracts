@@ -42,21 +42,12 @@ describe("RouteExecutor", () => {
 		await signer.sendTransaction({ to: signer.address }) // set nonce=1
 
 		uniswapV2Adaptor = await UniswapV2Adaptor.deploy() // nonce=1
-		// console.log("uniswapV2Adaptor.address:", uniswapV2Adaptor.address)
-		//
-		;[WETH, USDC, URB, BTC, SFM] = await Promise.all([
-			ERC20PresetFixedSupply.deploy("Wrapped Ether", "WETH", "100000000000000000000000", signer.address),
-			ERC20PresetFixedSupply.deploy(
-				//
-				"USDC",
-				"USDC",
-				"100000000000000000000000",
-				signer.address
-			),
-			ERC20PresetFixedSupply.deploy("Uroboros", "URB", "100000000000000000000000", signer.address),
-			ERC20PresetFixedSupply.deploy("Pegged Bitcoin", "BTC", "100000000000000000000000", signer.address),
-			ERC20TransferFee.deploy("SAFEMOON", "SFM", "100000000000000000000000"),
-		])
+
+		WETH = await ERC20PresetFixedSupply.deploy("Wrapped Ether", "WETH", "100000000000000000000000", signer.address)
+		USDC = await ERC20PresetFixedSupply.deploy("USDC", "USDC", "100000000000000000000000", signer.address)
+		URB = await ERC20PresetFixedSupply.deploy("Uroboros", "URB", "100000000000000000000000", signer.address)
+		BTC = await ERC20PresetFixedSupply.deploy("Pegged Bitcoin", "BTC", "100000000000000000000000", signer.address)
+		SFM = await ERC20TransferFee.deploy("SAFEMOON", "SFM", "100000000000000000000000")
 
 		urbRouter = await UrbRouter.deploy()
 

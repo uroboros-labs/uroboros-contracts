@@ -38,12 +38,26 @@ contract UrbRouter is RescueFunds {
 
 	event Error(string reason);
 
-	error InsufficientInput();
+	/// Current balance is less than expected input amount
+	/// @param partId current part
+	/// @param balance current balance
+	/// @param input expected input
+	error InsufficientInput(uint partId, uint balance, uint input);
 	/// Balance after swap is less than before
-	error NegativeOutput();
-	error NegativeLengthData();
-	error NegativeLengthSection();
-	error Amounts(uint[]);
+	/// @param partId current part
+	/// @param preBalance token balance before swap
+	/// @param postBalance token balance after swap
+	error NegativeOutput(uint partId, uint preBalance, uint postBalance);
+	/// Data end is smaller than start
+	/// @param start data start
+	/// @param end data end
+	error NegativeLengthData(uint start, uint end);
+	/// Section end is smaller than current start
+	/// @param start section start
+	/// @param end section end
+	error NegativeLengthSection(uint start, uint end);
+	/// Used for return-revert of amounts
+	error Amounts(uint[] amounts);
 
 	struct SwapParams {
 		address deployer; // adaptor deployer, used to calculate adaptor address
@@ -61,9 +75,12 @@ contract UrbRouter is RescueFunds {
 		gasUsed = gasleft();
 		(amounts, skipMask) = quote(params);
 		swapSection(params, amounts, skipMask, 0, params.parts.length, 0, revertBytes);
-		console.log("here10");
 		sendLeftovers(getNumTokens(params.parts), params.data);
-		console.log("here11");
+		uint _msize;
+		assembly {
+			_msize := mload(0x40)
+		}
+		console.log("msize: %s", _msize);
 		gasUsed -= gasleft();
 	}
 
@@ -71,11 +88,9 @@ contract UrbRouter is RescueFunds {
 	/// @param numTokens number of tokens to iterate, should be less or equal to actual length
 	/// @param data route data to iterate tokens in (go at the start)
 	function sendLeftovers(uint numTokens, bytes calldata data) internal {
-		console.log("numTokens: %s", numTokens);
 		for (uint256 i; i < numTokens; i++) {
 			address token = data.valueAt(i.toTokenPtr()).toLeAddress();
 			uint256 balance = IERC20(token).selfBalance();
-			console.log("token: %s, balance: %s", token, balance);
 			// if the're is leftover (cashbacks) it's send to msg.sender
 			if (!balance.isZero()) {
 				IERC20(token).safeTransfer(msg.sender, balance);
@@ -114,21 +129,25 @@ contract UrbRouter is RescueFunds {
 			tokenDepths[tokenOutId] = Math.max(tokenDepths[tokenOutId], sectionDepth);
 		}
 		for (uint256 i; i < tokenAmounts.length; i++) {
-			tokenAmounts[i] = new uint256[](tokenDepths[i] + 0x1);
+			tokenAmounts[i] = new uint256[](tokenDepths[i] + 1);
 		}
 	}
 
+	/// Extracts adaptor data from part and checks bounds
+	/// @param part currently executing part
+	/// @param data route data
+	/// @return data slice of route data
 	function getData(uint part, bytes calldata data) internal pure returns (bytes calldata) {
 		uint256 dataStart = part.dataStart();
 		uint256 dataEnd = part.dataEnd();
 		if (dataStart > dataEnd) {
-			revert NegativeLengthData();
+			revert NegativeLengthData(dataStart, dataEnd);
 		}
 		return data[dataStart:dataEnd];
 	}
 
 	/// Finds and checks tokenIn and amoutIn for quote
-	function getInput(
+	function getQuoteInput(
 		SwapParams calldata params,
 		uint[] memory tokenPart,
 		uint[][] memory tokenAmounts,
@@ -168,8 +187,9 @@ contract UrbRouter is RescueFunds {
 		}
 
 		if (!params.parts[i].isInput()) {
-			if (tokenAmounts[tokenInId][sectionDepth] < amountIn) {
-				revert InsufficientInput();
+			uint balance = tokenAmounts[tokenInId][sectionDepth];
+			if (balance < amountIn) {
+				revert InsufficientInput(i, balance, amountIn);
 			}
 			unchecked {
 				tokenAmounts[tokenInId][sectionDepth] -= amountIn;
@@ -210,9 +230,7 @@ contract UrbRouter is RescueFunds {
 		return (skipMask, i);
 	}
 
-	function quote(
-		SwapParams calldata params
-	) public view returns (uint256[] memory amounts, uint256 skipMask) {
+	function quote(SwapParams calldata params) public view returns (uint256[] memory amounts, uint256 skipMask) {
 		amounts = new uint256[](params.parts.length);
 
 		(uint[][] memory tokenAmounts, uint[] memory tokenPart) = setupAmountsAndParts(params);
@@ -223,13 +241,7 @@ contract UrbRouter is RescueFunds {
 			// 3. call adaptor and get out amount
 			// 4. save out amount and check it
 
-			(address tokenIn, uint amountIn) = getInput(
-				params,
-				tokenPart,
-				tokenAmounts,
-				skipMask,
-				i
-			);
+			(address tokenIn, uint amountIn) = getQuoteInput(params, tokenPart, tokenAmounts, skipMask, i);
 
 			address adaptor = params.deployer.getAddress(params.parts[i].adaptorId());
 			bytes memory data = getData(params.parts[i], params.data);
@@ -241,6 +253,7 @@ contract UrbRouter is RescueFunds {
 		}
 	}
 
+	/// Thin wrapper for __swapSection, if call failed, tries to extract amounts from error
 	function swapSection(
 		SwapParams calldata params,
 		uint[] memory amounts,
@@ -264,9 +277,9 @@ contract UrbRouter is RescueFunds {
 		uint selectorMask = ((1 << 32) - 1) << 224;
 		bool ok;
 		assembly {
-			let data_ptr := add(data, 0x20)
+			let data_ptr := add(data, 32)
 			// delegate call to this with data
-			ok := delegatecall(gas(), address(), data_ptr, mload(data), 0x0, 0x0)
+			ok := delegatecall(gas(), address(), data_ptr, mload(data), 0, 0)
 			// copy return data to input
 			let size := returndatasize()
 			mstore(data, size)
@@ -275,27 +288,21 @@ contract UrbRouter is RescueFunds {
 				errSelector := and(mload(data_ptr), selectorMask)
 				if eq(amountsSelector, errSelector) {
 					// copy return data and trim error selector
-					size := sub(size, 0x4)
+					size := sub(size, 4)
 					mstore(data, size)
-					returndatacopy(data_ptr, 0x4, size)
+					returndatacopy(data_ptr, 4, size)
 					ok := true
 				}
 			}
 		}
-		console.log("err_selector: %s", uint(bytes32(selectorMask)).toHex());
-		console.log("err_selector: %s", uint(bytes32(errSelector)).toHex());
-		console.log("amounts_selector: %s", uint(bytes32(amountsSelector)).toHex());
-		console.log("ok: %s", ok);
-		console.log("data: %s", data.toHex());
-		console.log("data.parse: %s", data.parse());
 		if (ok) {
+			// does memory even change?
+			// TODO: more efficient clone
 			uint[] memory outAmounts = abi.decode(data, (uint256[]));
-			console.log("outAmounts: %s", outAmounts.toString());
 			for (uint i; i < amounts.length; i++) {
 				amounts[i] = outAmounts[i];
 			}
 		} else {
-			console.log("err = data");
 			errHandler(data);
 		}
 	}
@@ -309,18 +316,18 @@ contract UrbRouter is RescueFunds {
 		uint256 depth
 	) external returns (uint256[] memory) {
 		if (start >= end) {
-			revert NegativeLengthSection();
+			revert NegativeLengthSection(start, end);
 		}
-		console.log("here1");
+		// console.log("here1");
 		while (start < end) {
 			if (skipMask.get(params.parts[start].sectionId())) {
 				start++;
 				continue;
 			}
-			console.log("here2");
+			// console.log("here2");
 			uint sectionDepth = params.parts[start].sectionDepth();
 			if (sectionDepth > depth) {
-				console.log("here3");
+				// console.log("here3");
 				uint256 sectionEnd = params.parts[start].sectionEnd();
 				swapSection(params, amounts, skipMask, start, sectionEnd, sectionDepth, emitErr);
 				start = sectionEnd;
@@ -331,43 +338,28 @@ contract UrbRouter is RescueFunds {
 		return amounts;
 	}
 
-	/// @notice uses msg.sender to transfer tokens, later sender should be provided in SwapParams
-	function swapPart(SwapParams calldata params, uint256[] memory amounts, uint256 i) internal {
-		console.log("here4");
-		address tokenIn;
-		uint256 amountIn;
-		{
-			// scope for balance, {token,amount}InIdx
-			uint256 tokenInId = params.parts[i].tokenInId();
-			tokenIn = params.data.valueAt(tokenInId.toTokenPtr()).toLeAddress();
+	function getSwapInput(SwapParams calldata params, uint i) internal returns (address tokenIn, uint amountIn) {
+		uint256 tokenInId = params.parts[i].tokenInId();
+		tokenIn = params.data.valueAt(tokenInId.toTokenPtr()).toLeAddress();
 
-			uint256 balance = IERC20(tokenIn).selfBalance();
-			uint256 amountInPtr = params.parts[i].amountInPtr();
-			if (amountInPtr.isZero()) {
-				amountIn = balance;
-			} else {
-				amountIn = params.data.valueAt(amountInPtr).toUint();
-				if (amountIn > balance) {
-					if (!params.parts[i].isInput()) {
-						revert InsufficientInput();
-					}
-					console.log(
-						"transferFrom(%s, %s, %s)",
-						msg.sender,
-						address(this),
-						amountIn - balance
-					);
-					unchecked {
-						IERC20(tokenIn).safeTransferFrom(
-							msg.sender,
-							address(this),
-							amountIn - balance
-						);
-					}
+		uint256 balance = IERC20(tokenIn).selfBalance();
+		uint256 amountInPtr = params.parts[i].amountInPtr();
+		if (amountInPtr.isZero()) {
+			amountIn = balance;
+		} else {
+			amountIn = params.data.valueAt(amountInPtr).toUint();
+			if (amountIn > balance) {
+				if (!params.parts[i].isInput()) {
+					revert InsufficientInput(i, balance, amountIn);
 				}
+				IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn - balance);
 			}
 		}
-		console.log("here5");
+	}
+
+	/// @notice uses msg.sender to transfer tokens, later sender should be provided in SwapParams
+	function swapPart(SwapParams calldata params, uint256[] memory amounts, uint256 i) internal {
+		(address tokenIn, uint amountIn) = getSwapInput(params, i);
 
 		address tokenOut;
 		{
@@ -375,7 +367,6 @@ contract UrbRouter is RescueFunds {
 			uint256 tokenOutId = params.parts[i].tokenOutId();
 			tokenOut = params.data.valueAt(tokenOutId.toTokenPtr()).toLeAddress();
 		}
-		console.log("here6");
 
 		address adaptor = UrbDeployer.getAddress(params.deployer, params.parts[i].adaptorId());
 		bytes memory data = getData(params.parts[i], params.data);
@@ -383,41 +374,32 @@ contract UrbRouter is RescueFunds {
 		address to = params.parts[i].isOutput() ? msg.sender : address(this);
 		data = abi.encodeWithSelector(IAdaptor.swap.selector, tokenIn, amountIn, data, to);
 
-		console.log("here7");
-
 		{
-			// scope for success, {post,pre}Balance
 			uint256 preBalance = IERC20(tokenOut).balanceOf(to);
 
 			bool success;
 			(success, data) = adaptor.delegatecall(data);
 			if (!success) {
-				// revert LowLevelError(data.parse());
 				revertBytes(data);
 			}
 
 			uint256 postBalance = IERC20(tokenOut).balanceOf(to);
 
 			if (postBalance < preBalance) {
-				revert NegativeOutput();
+				revert NegativeOutput(i, preBalance, postBalance);
 			}
 			unchecked {
 				amounts[i] = postBalance - preBalance;
 			}
 		}
 
-		console.log("here8");
-
 		{
 			uint256 amountOutMinPtr = params.parts[i].amountOutMinPtr();
-			bool success = amountOutMinPtr.isZero() ||
-				amounts[i] >= params.data.valueAt(amountOutMinPtr).toUint();
+			bool success = amountOutMinPtr.isZero() || amounts[i] >= params.data.valueAt(amountOutMinPtr).toUint();
 			if (!success) {
 				revert Amounts(amounts);
 			}
 		}
-
-		console.log("here9");
 	}
 
 	function emitErr(bytes memory err) internal {
@@ -428,7 +410,7 @@ contract UrbRouter is RescueFunds {
 function revertBytes(bytes memory data) pure {
 	assembly {
 		let data_len := mload(data)
-		let data_ptr := add(data, 0x20)
+		let data_ptr := add(data, 32)
 		revert(data_ptr, data_len)
 	}
 }
