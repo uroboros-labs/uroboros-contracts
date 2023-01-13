@@ -3,7 +3,7 @@
 	"useTabs": true,
 	"semi": false,
 	"arrowParens": "avoid",
-	"printWidth": 100,
+	"printWidth": 120,
 	"overrides": [
 		{
 			"files": "**/*.yml",
@@ -15,7 +15,7 @@
 		{
 			"files": "**/*.sol",
 			"options": {
-				"printWidth": 100
+				"compiler": "0.8.17"
 			}
 		}
 	]

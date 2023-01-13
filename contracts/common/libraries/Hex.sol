@@ -1,7 +1,11 @@
-// SPDX-License-Identifier: No license
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.8.17;
 
 library Hex {
+	function toHex(bytes32 value) internal pure returns (string memory) {
+		return toHex(uint(value));
+	}
+
 	function toHex(uint256 value) internal pure returns (string memory) {
 		return toHex(abi.encodePacked(value));
 	}

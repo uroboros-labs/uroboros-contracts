@@ -30,81 +30,43 @@ describe("RouteExecutor", () => {
 	beforeEach(async () => {
 		let [signer] = await ethers.getSigners()
 		deployer = signer.address
-		console.log("deployer:", deployer)
+		// console.log("deployer:", deployer)
 
-		let [ERC20PresetFixedSupply, UniswapV2Adaptor, UrbRouter, ERC20TransferFee] =
-			await Promise.all([
-				ethers.getContractFactory("ERC20PresetFixedSupply"),
-				ethers.getContractFactory("UniswapV2Adaptor"),
-				ethers.getContractFactory("UrbRouter"),
-				ethers.getContractFactory("ERC20TransferFee"),
-			])
+		let [ERC20PresetFixedSupply, UniswapV2Adaptor, UrbRouter, ERC20TransferFee] = await Promise.all([
+			ethers.getContractFactory("ERC20PresetFixedSupply"),
+			ethers.getContractFactory("UniswapV2Adaptor"),
+			ethers.getContractFactory("UrbRouter"),
+			ethers.getContractFactory("ERC20TransferFee"),
+		])
 
 		await signer.sendTransaction({ to: signer.address }) // set nonce=1
 
 		uniswapV2Adaptor = await UniswapV2Adaptor.deploy() // nonce=1
-		console.log("uniswapV2Adaptor.address:", uniswapV2Adaptor.address)
-		//
-		;[WETH, USDC, URB, BTC, SFM] = await Promise.all([
-			ERC20PresetFixedSupply.deploy(
-				"Wrapped Ether",
-				"WETH",
-				"100000000000000000000000",
-				signer.address
-			),
-			ERC20PresetFixedSupply.deploy(
-				//
-				"USDC",
-				"USDC",
-				"100000000000000000000000",
-				signer.address
-			),
-			ERC20PresetFixedSupply.deploy(
-				"Uroboros",
-				"URB",
-				"100000000000000000000000",
-				signer.address
-			),
-			ERC20PresetFixedSupply.deploy(
-				"Pegged Bitcoin",
-				"BTC",
-				"100000000000000000000000",
-				signer.address
-			),
-			ERC20TransferFee.deploy("SAFEMOON", "SFM", "100000000000000000000000"),
-		])
+
+		WETH = await ERC20PresetFixedSupply.deploy("Wrapped Ether", "WETH", "100000000000000000000000", signer.address)
+		USDC = await ERC20PresetFixedSupply.deploy("USDC", "USDC", "100000000000000000000000", signer.address)
+		URB = await ERC20PresetFixedSupply.deploy("Uroboros", "URB", "100000000000000000000000", signer.address)
+		BTC = await ERC20PresetFixedSupply.deploy("Pegged Bitcoin", "BTC", "100000000000000000000000", signer.address)
+		SFM = await ERC20TransferFee.deploy("SAFEMOON", "SFM", "100000000000000000000000")
 
 		urbRouter = await UrbRouter.deploy()
-		;[
-			wethUsdcPair14,
-			wethUsdcPair15,
-			urbUsdcPair12,
-			btcWethPair17,
-			btcUsdcPair19,
-			usdcSfmPair16,
-			urbSfmPair14,
-		] = await Promise.all([
-			createUniswapV2Pair(WETH, USDC, "100000000000000000000", "400000000000000000000"),
-			createUniswapV2Pair(WETH, USDC, "100000000000000000000", "500000000000000000000"),
-			createUniswapV2Pair(URB, USDC, "100000000000000000000", "200000000000000000000"),
-			createUniswapV2Pair(BTC, WETH, "100000000000000000000", "700000000000000000000"),
-			createUniswapV2Pair(BTC, USDC, "100000000000000000000", "900000000000000000000"),
-			createUniswapV2Pair(USDC, SFM, "100000000000000000000", "600000000000000000000"),
-			createUniswapV2Pair(URB, SFM, "100000000000000000000", "400000000000000000000"),
-		])
 
-		await Promise.all([
-			SFM.setTransferToFee(usdcSfmPair16.address, "3000"),
-			SFM.setTransferFromFee(usdcSfmPair16.address, "2000"),
-			SFM.setTransferToFee(urbSfmPair14.address, "3000"),
-			SFM.setTransferFromFee(urbSfmPair14.address, "2000"),
-		])
+		wethUsdcPair14 = await createUniswapV2Pair(WETH, USDC, "100000000000000000000", "400000000000000000000")
+		wethUsdcPair15 = await createUniswapV2Pair(WETH, USDC, "100000000000000000000", "500000000000000000000")
+		urbUsdcPair12 = await createUniswapV2Pair(URB, USDC, "100000000000000000000", "200000000000000000000")
+		btcWethPair17 = await createUniswapV2Pair(BTC, WETH, "100000000000000000000", "700000000000000000000")
+		btcUsdcPair19 = await createUniswapV2Pair(BTC, USDC, "100000000000000000000", "900000000000000000000")
+		usdcSfmPair16 = await createUniswapV2Pair(USDC, SFM, "100000000000000000000", "600000000000000000000")
+		urbSfmPair14 = await createUniswapV2Pair(URB, SFM, "100000000000000000000", "400000000000000000000")
 
-		await Promise.all([
-			WETH.approve(urbRouter.address, BigNumber.from(1).shl(256).sub(1)),
-			USDC.approve(urbRouter.address, BigNumber.from(1).shl(256).sub(1)),
-			URB.approve(urbRouter.address, BigNumber.from(1).shl(256).sub(1)),
-		])
+		await SFM.setTransferToFee(usdcSfmPair16.address, "3000")
+		await SFM.setTransferFromFee(usdcSfmPair16.address, "2000")
+		await SFM.setTransferToFee(urbSfmPair14.address, "3000")
+		await SFM.setTransferFromFee(urbSfmPair14.address, "2000")
+
+		await WETH.approve(urbRouter.address, BigNumber.from(1).shl(256).sub(1))
+		await USDC.approve(urbRouter.address, BigNumber.from(1).shl(256).sub(1))
+		await URB.approve(urbRouter.address, BigNumber.from(1).shl(256).sub(1))
 	})
 
 	it("URB->SFM->USDC", async () => {
@@ -142,11 +104,12 @@ describe("RouteExecutor", () => {
 				sectionEnd: 2,
 			},
 		])
-		console.log(route)
+		// console.log(route)
 		let [amounts, skipMask, gasUsed] = await urbRouter.callStatic.swap({ ...route, deployer })
-		console.log("amounts:", amounts)
-		console.log("skipMask:", skipMask)
-		console.log("gasUsed:", gasUsed)
+		// console.log("amounts:", amounts)
+		// console.log("skipMask:", skipMask)
+		// console.log("gasUsed:", gasUsed)
+		expect(skipMask).eq("0")
 		expect(amounts[0]).eq("3157881352671220601") // URB(1.0) -> SFM(3.15) ~ 1/4 + 20%
 		expect(amounts[1]).eq("365954187525228600") //
 	})

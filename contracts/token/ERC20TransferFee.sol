@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: No license
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -60,7 +60,7 @@ contract ERC20TransferFee is Ownable, IERC20, IERC20Metadata {
 		unchecked {
 			balanceOf[owner] -= amount;
 		}
-		uint256 totalFee = _transferFromFee.mul(_transferToFee);
+		uint256 totalFee = _transferFromFee.feeMul(_transferToFee);
 		// console.log("totalFee: %s", totalFee);
 		amount = totalFee.getAmountLessFee(amount);
 		// console.log("amountLessFee: %s", amount);

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: No license
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -14,11 +14,7 @@ library UrbERC20 {
 		return (token == _ZERO_ADDRESS || token == _ETH_ADDRESS);
 	}
 
-	function transfer(
-		IERC20 token,
-		address to,
-		uint256 amount
-	) internal {
+	function transfer(IERC20 token, address to, uint256 amount) internal {
 		if (isETH(token)) {
 			(bool ok, ) = to.call{value: amount}("");
 			require(ok, "UrbERC20: ETH_TRANSFER_FAILED");

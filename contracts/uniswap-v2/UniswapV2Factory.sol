@@ -1,5 +1,7 @@
-// SPDX-License-Identifier: No license
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.8.17;
+
+// COPIED FROM https://github.com/Uniswap/v2-core
 
 import "./interfaces/IUniswapV2Factory.sol";
 import "./UniswapV2Pair.sol";

@@ -1,5 +1,7 @@
-// SPDX-License-Identifier: No license
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.8.17;
+
+// COPIED FROM https://github.com/Uniswap/v2-core
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
