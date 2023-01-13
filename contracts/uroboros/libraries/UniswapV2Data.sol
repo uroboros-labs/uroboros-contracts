@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: No license
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.8.17;
 
 library UniswapV2Data {

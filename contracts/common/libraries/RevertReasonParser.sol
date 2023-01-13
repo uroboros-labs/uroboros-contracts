@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: No license
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.8.17;
 
 import "./Hex.sol";
@@ -14,20 +14,10 @@ library RevertReasonParser {
 	}
 
 	function getType(bytes memory data) internal pure returns (ErrorType) {
-		if (
-			data.length >= 68 &&
-			data[0] == 0x08 &&
-			data[1] == 0xc3 &&
-			data[2] == 0x79 &&
-			data[3] == 0xa0
-		) return ErrorType.Error;
-		else if (
-			data.length == 36 &&
-			data[0] == 0x4e &&
-			data[1] == 0x48 &&
-			data[2] == 0x7b &&
-			data[3] == 0x71
-		) return ErrorType.Panic;
+		if (data.length >= 68 && data[0] == 0x08 && data[1] == 0xc3 && data[2] == 0x79 && data[3] == 0xa0)
+			return ErrorType.Error;
+		else if (data.length == 36 && data[0] == 0x4e && data[1] == 0x48 && data[2] == 0x7b && data[3] == 0x71)
+			return ErrorType.Panic;
 		else return ErrorType.Unknown;
 	}
 

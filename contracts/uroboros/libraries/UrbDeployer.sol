@@ -1,9 +1,9 @@
-// SPDX-License-Identifier: No license
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.8.17;
 
-import "../../common/libraries/Hex.sol";
-
 library UrbDeployer {
+	error ContractNotDeployed();
+
 	/// Compute contract address, deployed by address with nonce
 	/// @notice nonce should be in range (0, 0x7f]
 	function getAddress(address self, uint256 nonce) internal view returns (address addr) {
@@ -16,6 +16,8 @@ library UrbDeployer {
 			addr := keccak256(add(ptr, 0x9), 0x17)
 			mstore(ptr, 0x0)
 		}
-		require(addr.code.length != 0, "UrbDeployer: contract not deployed");
+		if (addr.code.length == 0) {
+			revert ContractNotDeployed();
+		}
 	}
 }

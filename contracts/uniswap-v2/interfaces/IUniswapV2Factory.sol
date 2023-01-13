@@ -1,5 +1,7 @@
-// SPDX-License-Identifier: No license
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.8.17;
+
+// COPIED FROM https://github.com/Uniswap/v2-core
 
 interface IUniswapV2Factory {
 	event PairCreated(address indexed token0, address indexed token1, address pair, uint256);

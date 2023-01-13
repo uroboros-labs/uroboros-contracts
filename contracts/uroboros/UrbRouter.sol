@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: No license
+// SPDX-License-Identifier: MIT
 pragma solidity >=0.8.17;
 
 import "../common/RescueFunds.sol";
@@ -75,6 +75,7 @@ contract UrbRouter is RescueFunds {
 		gasUsed = gasleft();
 		(amounts, skipMask) = quote(params);
 		swapSection(params, amounts, skipMask, 0, params.parts.length, 0, revertBytes);
+		// console.log("swapSection");
 		sendLeftovers(getNumTokens(params.parts), params.data);
 		uint _msize;
 		assembly {
@@ -243,7 +244,16 @@ contract UrbRouter is RescueFunds {
 
 			(address tokenIn, uint amountIn) = getQuoteInput(params, tokenPart, tokenAmounts, skipMask, i);
 
-			address adaptor = params.deployer.getAddress(params.parts[i].adaptorId());
+			// console.log(
+			// 	"i: %s, section: %s, depth: %s",
+			// 	i,
+			// 	params.parts[i].sectionId(),
+			// 	params.parts[i].sectionDepth()
+			// );
+
+			uint adaptorId = params.parts[i].adaptorId();
+			// console.log("adaptorId: %s", adaptorId);
+			address adaptor = params.deployer.getAddress(adaptorId);
 			bytes memory data = getData(params.parts[i], params.data);
 
 			amounts[i] = IAdaptor(adaptor).quote(tokenIn, amountIn, data);
@@ -318,20 +328,19 @@ contract UrbRouter is RescueFunds {
 		if (start >= end) {
 			revert NegativeLengthSection(start, end);
 		}
-		// console.log("here1");
 		while (start < end) {
 			if (skipMask.get(params.parts[start].sectionId())) {
 				start++;
 				continue;
 			}
-			// console.log("here2");
 			uint sectionDepth = params.parts[start].sectionDepth();
+			// console.log("sectionDepth: %s", sectionDepth);
 			if (sectionDepth > depth) {
-				// console.log("here3");
 				uint256 sectionEnd = params.parts[start].sectionEnd();
 				swapSection(params, amounts, skipMask, start, sectionEnd, sectionDepth, emitErr);
 				start = sectionEnd;
 			} else {
+				// console.log("i: %s, depth: %s", start, depth);
 				swapPart(params, amounts, start++);
 			}
 		}
@@ -380,6 +389,7 @@ contract UrbRouter is RescueFunds {
 			bool success;
 			(success, data) = adaptor.delegatecall(data);
 			if (!success) {
+				console.log("%s", data.parse());
 				revertBytes(data);
 			}
 
@@ -391,6 +401,8 @@ contract UrbRouter is RescueFunds {
 			unchecked {
 				amounts[i] = postBalance - preBalance;
 			}
+			console.log(tokenOut);
+			console.log(amounts[i]);
 		}
 
 		{
