@@ -36,7 +36,7 @@ library Route {
 		route = new Part[](length);
 		for (uint i; i < length; i++) {
 			Part memory part = route[i];
-			uint value = payload.valueAt(i * 32).toUint();
+			uint value = payload.valueAt((i + 1) * 32).toUint();
 			part.tokenIn = payload.valueAt(value.getBits(0, 16)).toAddress();
 			part.tokenOut = payload.valueAt(value.getBits(16, 16)).toAddress();
 			uint ptr;
@@ -47,8 +47,9 @@ library Route {
 				part.amountOutMin = payload.valueAt(ptr).toUint();
 			}
 			{
-				Adaptor adaptor = Adaptor(value.getBits(64, 8));
-				require(adaptor <= type(Adaptor).max, "invalid adaptor");
+				uint tmp = value.getBits(64, 8);
+				require(tmp <= uint(type(Adaptor).max), "invalid adaptor");
+				Adaptor adaptor = Adaptor(tmp);
 				function(address, uint, bytes memory) view returns (uint) quote;
 				function(address, uint, bytes memory, address) swap;
 				if (adaptor == Adaptor.UniswapV2) {
