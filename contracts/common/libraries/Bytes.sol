@@ -14,9 +14,18 @@ library Bytes {
 	}
 
 	function valueAt(bytes calldata self, uint256 ptr) internal pure returns (bytes32 value) {
-		assembly {
-			value := calldataload(add(self.offset, ptr))
+		assembly ("memory-safe") {
+			ptr := add(ptr, self.offset)
 		}
+		require(ptr < msg.data.length, "out of bounds");
+		assembly ("memory-safe") {
+			value := calldataload(ptr)
+		}
+	}
+
+	function slice(bytes calldata data, uint start, uint end) internal pure returns (bytes calldata) {
+		require(start >= end, "negative length slice");
+		return data[start:end];
 	}
 
 	function isZero(bytes memory self) internal pure returns (bool x) {

@@ -6,7 +6,7 @@ library UrbDeployer {
 
 	/// Compute contract address, deployed by address with nonce
 	/// @notice nonce should be in range (0, 0x7f]
-	function getAddress(address self, uint256 nonce) internal view returns (address addr) {
+	function getAddress(address self, uint256 nonce) internal pure returns (address addr) {
 		require(nonce != 0 && nonce <= 0x7f, "UrbDeployer: invalid nonce");
 		uint256 value;
 		assembly {
@@ -16,8 +16,8 @@ library UrbDeployer {
 			addr := keccak256(add(ptr, 0x9), 0x17)
 			mstore(ptr, 0x0)
 		}
-		if (addr.code.length == 0) {
-			revert ContractNotDeployed();
-		}
+		// if (addr.code.length == 0) {
+		// 	revert ContractNotDeployed();
+		// }
 	}
 }

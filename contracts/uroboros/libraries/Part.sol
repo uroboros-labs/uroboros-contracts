@@ -81,7 +81,7 @@ library Part {
 		return (self >> 0x78) & 0x1 != 0x0;
 	}
 
-	function getAdaptor(uint256 self, address deployer) internal view returns (address) {
+	function getAdaptor(uint256 self, address deployer) internal pure returns (address) {
 		return UrbDeployer.getAddress(deployer, adaptorId(self));
 	}
 }
