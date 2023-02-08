@@ -2,6 +2,7 @@
 pragma solidity >=0.8.17;
 
 import "./UrbDeployer.sol";
+import "./Route.sol";
 
 library Part {
 	/// Amount in ptr
@@ -84,4 +85,36 @@ library Part {
 	function getAdaptor(uint256 self, address deployer) internal pure returns (address) {
 		return UrbDeployer.getAddress(deployer, adaptorId(self));
 	}
+
+	function quote(
+		Route.Part memory part,
+		address tokenIn,
+		uint amountIn
+	) internal view returns (uint) {
+		function(address, uint, bytes memory) view returns (uint) _quote;
+		uint quotePtr = part._quotePtr;
+		assembly ("memory-safe") {
+			_quote := quotePtr
+		}
+		return _quote(tokenIn, amountIn, part.data);
+	}
+
+	function swap(Route.Part memory part, address tokenIn, uint amountIn, address to) internal {
+		function(address, uint, bytes memory, address) _swap;
+		uint swapPtr = part._swapPtr;
+		assembly ("memory-safe") {
+			_swap := swapPtr
+		}
+		_swap(tokenIn, amountIn, part.data, to);
+	}
+
+	function sectionId(Route.Part memory part) internal pure returns (uint) {}
+
+	function sectionDepth(Route.Part memory part) internal pure returns (uint) {}
+
+	function sectionEnd(Route.Part memory part) internal pure returns (uint) {}
+
+	function isInput(Route.Part memory part) internal pure returns (uint) {}
+
+	function isOutput(Route.Part memory part) internal pure returns (uint) {}
 }

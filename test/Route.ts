@@ -17,8 +17,8 @@ describe("Route", () => {
 	})
 
 	it("route: insufficient calldata", async () => {
-		let data = Buffer.alloc(128)
-		data.writeUint8(3, 31)
+		let data = Buffer.alloc(64)
+		data.writeUint8(1, 31)
 		let part: CompiledPart = {
 			tokenInPtr: 0,
 			tokenOutPtr: 0,
@@ -34,8 +34,6 @@ describe("Route", () => {
 			isOutput: false,
 		}
 		encodePart(part, data, 32)
-		encodePart(part, data, 64)
-		encodePart(part, data, 96)
 		let route = await routeTest.testDecode(data)
 		console.log(route)
 	})

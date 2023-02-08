@@ -8,6 +8,12 @@ library SafeCast {
 		}
 	}
 
+	function toAddress(bytes32 self) internal pure returns (address x) {
+		assembly ("memory-safe") {
+			x := self
+		}
+	}
+
 	function toUint(bytes32 self) internal pure returns (uint256 x) {
 		assembly {
 			x := self

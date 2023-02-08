@@ -7,22 +7,26 @@ import "../../uniswap-v2/interfaces/IUniswapV2Pair.sol";
 import "../../common/libraries/Fee.sol";
 import "../../common/libraries/Hex.sol";
 import "../libraries/UniswapV2Data.sol";
-import "../interfaces/IAdaptor.sol";
 
 import "hardhat/console.sol";
 
-contract UniswapV2Adaptor is IAdaptor {
+library UniswapV2Adaptor {
 	using Fee for uint;
 	using Math for uint;
 	using SafeMath for uint;
 	using UniswapV2Data for bytes;
 
-	function quote(address, uint256 amountIn, bytes memory data) public view returns (uint256) {
+	struct SwapData {
+		address pair;
+		uint _flags; // contains swapFee, .., zeroForOne
+	}
+
+	function quote(address, uint256 amountIn, bytes memory data) internal view returns (uint256) {
 		data.check();
 		return data.buyFee().getAmountLessFee(_quote(data.pairAddress(), amountIn, data));
 	}
 
-	function swap(address tokenIn, uint256 amountIn, bytes memory data, address to) public payable {
+	function swap(address tokenIn, uint256 amountIn, bytes memory data, address to) internal {
 		data.check();
 		// console.log("================");
 		// console.log("data: %s", Hex.toHex(data));
@@ -53,7 +57,7 @@ contract UniswapV2Adaptor is IAdaptor {
 		IUniswapV2Pair(addr).swap(amount0Out, amount1Out, to, "");
 	}
 
-	function _quote(address addr, uint256 amountIn, bytes memory data) internal view returns (uint256) {
+	function _quote(address addr, uint256 amountIn, bytes memory data) private view returns (uint256) {
 		// oneForZero 0->1
 		// reserve0, reserve1
 		(uint112 reserveOut, uint112 reserveIn, ) = IUniswapV2Pair(addr).getReserves();
@@ -68,7 +72,7 @@ contract UniswapV2Adaptor is IAdaptor {
 		return amountOut;
 	}
 
-	function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) internal pure returns (uint256) {
+	function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut) private pure returns (uint256) {
 		require(!amountIn.isZero(), "UniswapV2Adaptor: zero input");
 		return amountIn.mul(reserveOut) / (amountIn.add(reserveIn));
 	}
