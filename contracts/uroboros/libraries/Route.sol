@@ -8,10 +8,8 @@ library Route {
 	using Bytes for bytes;
 	using UrbDeployer for address;
 
-	struct Section {
-		uint id;
-		uint depth;
-		uint end;
+	enum Adaptor {
+		UniswapV2
 	}
 
 	struct Part {
@@ -21,9 +19,14 @@ library Route {
 		uint amountOutMin;
 		address adaptor;
 		bytes adaptorData;
-		Section section;
+		uint sectionId;
+		uint sectionDepth;
+		uint sectionEnd;
 		bool isInput;
 		bool isOutput;
+		uint _flags; // contains
+		function(address, uint, bytes memory) returns (uint) quote;
+		function(address, uint, bytes memory, address) swap;
 	}
 
 	function shift_mask(uint value, uint size) private pure returns (uint, uint) {
@@ -56,9 +59,9 @@ library Route {
 			uint temp2;
 			(value, temp2) = shift_mask(value, 0x10);
 			part.adaptorData = payload.slice(temp, temp2);
-			(value, part.section.id) = shift_mask(value, 0x8);
-			(value, part.section.depth) = shift_mask(value, 0x8);
-			(value, part.section.end) = shift_mask(value, 0x8);
+			(value, part.sectionId) = shift_mask(value, 0x8);
+			(value, part.sectionDepth) = shift_mask(value, 0x8);
+			(value, part.sectionEnd) = shift_mask(value, 0x8);
 			(value, temp) = shift_mask(value, 0x8);
 			part.isInput = temp != 0x0;
 			(value, temp) = shift_mask(value, 0x8);
@@ -66,5 +69,55 @@ library Route {
 			offset += 0x20;
 		}
 		return route;
+	}
+
+	function decodeYul(bytes calldata payload) internal pure returns (Part[] memory route) {
+		assembly ("memory-safe") {
+			function allocate(size) -> ptr {
+				ptr := mload(0x40)
+				mstore(0x40, add(ptr, size))
+			}
+
+			function allocate_array(length) -> ptr {
+				ptr := allocate(mul(add(length, 0x1), 0x20))
+			}
+
+			function index_array(ptr, index) -> item_ptr {
+				let length := mload(ptr)
+				if gt(index, length) {
+					// revert
+				}
+				item_ptr := add(ptr, mul(0x20, add(index, 0x1)))
+			}
+
+			function shift_mask(x, s) -> y, z {
+				y := shr(s, x)
+				z := and(x, sub(shl(s, 0x1), 0x1))
+			}
+
+			let value := calldataload(payload.offset)
+			let length, deployer, tmp, offset
+			value, length := shift_mask(value, 0x8)
+			route := allocate_array(length)
+			value, deployer := shift_mask(value, 0xa0)
+
+			for {
+				let i := 0x0
+			} lt(i, length) {
+				i := add(i, 0x1)
+			} {
+				let part := index_array(route, i)
+				mstore(part, allocate(352)) // Part size
+				value := calldataload(add(payload.offset, offset))
+
+				// amountIn
+				value, tmp := shift_mask(value, 0x10)
+				tmp := calldataload(add(payload.offset, tmp))
+				mstore(part, tmp)
+				part := add(part, 0x20)
+
+				offset := add(offset, 0x20)
+			}
+		}
 	}
 }
