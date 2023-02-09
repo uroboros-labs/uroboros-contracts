@@ -51,7 +51,7 @@ library Strings2 {
 		string memory str,
 		uint length
 	) private pure returns (string memory) {
-		while (bytes(str).length < length) {
+		while (bytes(str).length < length - 1) {
 			str = string.concat(str, ' ');
 		}
 		return str;

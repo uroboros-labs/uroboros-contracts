@@ -62,26 +62,24 @@ contract Router {
 				tokenMaxId = tokenMaxId.max(part.tokenInId());
 				tokenMaxId = tokenMaxId.max(part.tokenOutId());
 			}
-			totals = new uint[][](tokenMaxId++);
+			totals = new uint[][](tokenMaxId + 1);
 		}
 		for (uint i; i < totals.length; i++) {
 			totals[i] = new uint[](route.length);
 		}
 		for (uint i; i < route.length; ) {
-			Route.Part memory part;
+			Route.Part memory part = route[i];
 			uint tokenInId = part.tokenInId();
 			uint tokenOutId = part.tokenOutId();
 			uint totalAmountIn;
 			uint totalAmountOut;
 			for (uint j; j < i; j++) {
-				part = route[j];
-				if (skipMask & part.sectionId() == 0) {
+				if (skipMask & route[j].sectionId() == 0) {
 					uint tmp;
 					if ((tmp = totals[tokenInId][j]) != 0) totalAmountIn = tmp;
 					if ((tmp = totals[tokenOutId][j]) != 0) totalAmountOut = tmp;
 				}
 			}
-			part = route[i];
 			uint amountIn = totalAmountIn;
 			if (part.amountIn > totalAmountIn) {
 				totalAmountIn = amountIn = part.amountIn;
@@ -90,6 +88,7 @@ contract Router {
 			}
 			// log(totals);
 			uint amountOut = part.quote(amountIn);
+			// console.log('tokenInId: %s, tokenOutId: %s', tokenInId, tokenOutId);
 			// console.log('totalAmountIn: %s, amountIn: %s', totalAmountIn, amountIn);
 			// console.log('totalAmountOut: %s, amountOut: %s', totalAmountOut, amountOut);
 			totals[tokenInId][i] = totalAmountIn - amountIn;

@@ -39,6 +39,8 @@ describe('Route', () => {
 			sectionEnd: 0,
 			isInput: false,
 			isOutput: false,
+			tokenInId: 0,
+			tokenOutId: 0,
 		}
 		encodePart(part, data, 32)
 		let route = await routeTest.testDecode(data)
@@ -74,17 +76,18 @@ describe('Route', () => {
 				isOutput: true,
 			},
 		]
-		let data = encodeRoute(route)
+		let { data, compiled } = encodeRoute(route)
 		let result = await routeTest.testDecode(data)
-		verifyDecode(route, result)
+		verifyDecode(route, compiled, result)
 	}
 })
 
-function verifyDecode(route: Part[], decoded: Route.PartStructOutput[]) {
+function verifyDecode(route: Part[], compiled: CompiledPart[], decoded: Route.PartStructOutput[]) {
 	if (route.length !== decoded.length) {
 		throw new Error('lengths dont match')
 	}
 	route.forEach((part, i) => {
+		let com = compiled[i]
 		let dec = decoded[i]
 		if (part.tokenIn !== dec.tokenIn) throw new Error('tokenIn')
 		if (part.tokenOut !== dec.tokenOut) throw new Error('tokenOut')
@@ -98,5 +101,7 @@ function verifyDecode(route: Part[], decoded: Route.PartStructOutput[]) {
 		if (part.sectionEnd !== flags.sectionEnd) throw new Error('sectionEnd')
 		if (part.isInput !== flags.isInput) throw new Error('isInput')
 		if (part.isOutput !== flags.isOutput) throw new Error('isOutput')
+		if (com.tokenInId !== flags.tokenInId) throw new Error('tokenInId')
+		if (com.tokenOutId !== flags.tokenOutId) throw new Error('tokenOutId')
 	})
 }

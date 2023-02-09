@@ -42,6 +42,8 @@ export type ParsedFlags = {
 	sectionEnd: number
 	isInput: boolean
 	isOutput: boolean
+	tokenInId: number
+	tokenOutId: number
 }
 
 export function encodePart(part: CompiledPart, buf: Buffer, offset: number) {
@@ -61,7 +63,7 @@ export function encodePart(part: CompiledPart, buf: Buffer, offset: number) {
 	buf.writeUint8(part.tokenOutId, offset + 12)
 }
 
-export function encodeRoute(route: Part[]): Buffer {
+export function encodeRoute(route: Part[]): { data: Buffer; compiled: CompiledPart[] } {
 	let tokenId = new Map<string, number>()
 	let amountId = new Map<string, number>()
 	// let size = 0
@@ -100,6 +102,7 @@ export function encodeRoute(route: Part[]): Buffer {
 			isOutput: part.isOutput,
 		}
 	})
+	// console.log(compiled)
 	let data = Buffer.alloc(offset + 32)
 	data.writeUInt32BE(route.length, 28) // 32 - 4
 	offset = 32
@@ -119,7 +122,7 @@ export function encodeRoute(route: Part[]): Buffer {
 		part.data.copy(data, offset)
 		offset += part.data.length
 	})
-	return data
+	return { data, compiled }
 }
 
 export function parseFlags(_flags: BigNumberish): ParsedFlags {
@@ -130,7 +133,8 @@ export function parseFlags(_flags: BigNumberish): ParsedFlags {
 		sectionEnd: flags.shr(16).and(0xff).toNumber(),
 		isInput: !flags.shr(24).and(0xff).isZero(),
 		isOutput: !flags.shr(32).and(0xff).isZero(),
-		// todo: tokenInId, tokenOutId
+		tokenInId: flags.shr(40).and(0xff).toNumber(),
+		tokenOutId: flags.shr(48).and(0xff).toNumber(),
 	}
 }
 
