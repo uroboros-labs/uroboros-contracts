@@ -35,8 +35,10 @@ contract Router {
 		SectionDesc memory desc;
 		desc.end = route.length;
 		desc.skipMask = skipMask;
-		try this._swap(route, amounts, desc) returns (uint[] memory _amounts) {
+		try this._swap(route, amounts, desc, msg.sender) returns (uint[] memory _amounts) {
 			amounts = _amounts;
+		} catch Error(string memory reason) {
+			revert(reason);
 		} catch (bytes memory data) {
 			// decode return-reverted amounts
 			amounts = abi.decode(data, (uint[]));
@@ -83,14 +85,9 @@ contract Router {
 			uint amountIn = totalAmountIn;
 			if (part.amountIn > totalAmountIn) {
 				totalAmountIn = amountIn = part.amountIn;
-				// log(totals);
 				require(part.isInput(), 'quote: insufficient input');
 			}
-			// log(totals);
 			uint amountOut = part.quote(amountIn);
-			// console.log('tokenInId: %s, tokenOutId: %s', tokenInId, tokenOutId);
-			// console.log('totalAmountIn: %s, amountIn: %s', totalAmountIn, amountIn);
-			// console.log('totalAmountOut: %s, amountOut: %s', totalAmountOut, amountOut);
 			totals[tokenInId][i] = totalAmountIn - amountIn;
 			totals[tokenOutId][i] = totalAmountOut + amountOut;
 			amounts[i] = amountOut;
@@ -113,7 +110,8 @@ contract Router {
 	function _swap(
 		Route.Part[] calldata route,
 		uint[] memory amounts,
-		SectionDesc memory desc
+		SectionDesc memory desc,
+		address sender
 	) external onlySelf returns (uint[] memory) {
 		while (desc.start < desc.end) {
 			Route.Part calldata part = route[desc.start];
@@ -124,33 +122,44 @@ contract Router {
 			if (sectionDepth > desc.depth) {
 				desc.depth = sectionDepth;
 				desc.end = part.sectionEnd();
-				try this._swap(route, amounts, desc) returns (uint[] memory _amounts) {
+				try this._swap(route, amounts, desc, sender) returns (uint[] memory _amounts) {
 					amounts = _amounts;
+				} catch Error(string memory reason) {
+					revert(reason);
 				} catch (bytes memory data) {
 					// decode return-reverted amounts
 					amounts = abi.decode(data, (uint[]));
 				}
 			} else {
-				uint amountIn = part.amountIn != 0
-					? part.amountIn
-					: IERC20(part.tokenIn).balanceOf(address(this));
-				address to = part.isOutput() ? msg.sender : address(this);
-				uint preBalance = IERC20(part.tokenOut).balanceOf(to);
+				uint amountIn = part.amountIn;
+				uint balance = part.tokenIn.balanceOf(address(this));
+				if (amountIn == 0) {
+					amountIn = balance;
+				} else if (amountIn > balance) {
+					require(part.isInput(), 'swap: insufficient input');
+					part.tokenIn.safeTransferFrom(sender, address(this), amountIn - balance);
+				}
+				address to = part.isOutput() ? sender : address(this);
+				balance = part.tokenOut.balanceOf(to);
 				part.swap(amountIn, to);
-				uint postBalance = IERC20(part.tokenOut).balanceOf(to);
-				amounts[desc.start] = postBalance - preBalance;
-				if (postBalance < preBalance + part.amountOutMin) {
+				uint postBalance = part.tokenOut.balanceOf(to);
+				amounts[desc.start] = postBalance - balance;
+				if (postBalance < balance + part.amountOutMin) {
 					// return-revert amounts
-					bytes memory data = abi.encode(amounts);
-					assembly ('memory-safe') {
-						let size := mload(data)
-						let offset := add(data, 0x20)
-						revert(offset, size)
-					}
+					_revertWith(amounts);
 				}
 				desc.start++;
 			}
 		}
 		return amounts;
+	}
+
+	function _revertWith(uint[] memory values) internal pure {
+		bytes memory data = abi.encode(values);
+		assembly ('memory-safe') {
+			let size := mload(data)
+			let offset := add(data, 0x20)
+			revert(offset, size)
+		}
 	}
 }

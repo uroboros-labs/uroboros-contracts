@@ -16,8 +16,8 @@ library Route {
 	}
 
 	struct Part {
-		address tokenIn;
-		address tokenOut;
+		IERC20 tokenIn;
+		IERC20 tokenOut;
 		uint amountIn;
 		uint amountOutMin;
 		bytes data;
@@ -34,8 +34,8 @@ library Route {
 		for (uint i; i < length; i++) {
 			Part memory part = route[i];
 			uint value = payload.valueAt((i + 1) * 32).toUint();
-			part.tokenIn = payload.valueAt(value.getBits(0, 16)).toAddress();
-			part.tokenOut = payload.valueAt(value.getBits(16, 16)).toAddress();
+			part.tokenIn = IERC20(payload.valueAt(value.getBits(0, 16)).toAddress());
+			part.tokenOut = IERC20(payload.valueAt(value.getBits(16, 16)).toAddress());
 			uint ptr;
 			if ((ptr = value.getBits(32, 16)) != 0) {
 				part.amountIn = payload.valueAt(ptr).toUint();
@@ -47,8 +47,8 @@ library Route {
 				uint tmp = value.getBits(64, 8);
 				require(tmp <= uint(type(Adaptor).max), 'invalid adaptor');
 				Adaptor adaptor = Adaptor(tmp);
-				function(address, uint, bytes memory) view returns (uint) quote;
-				function(address, uint, bytes memory, address) swap;
+				function(IERC20, uint, bytes memory) view returns (uint) quote;
+				function(IERC20, uint, bytes memory, address) swap;
 				if (adaptor == Adaptor.UniswapV2) {
 					quote = UniswapV2Adaptor.quote;
 					swap = UniswapV2Adaptor.swap;

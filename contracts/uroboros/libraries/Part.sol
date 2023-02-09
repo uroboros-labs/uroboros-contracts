@@ -90,7 +90,7 @@ library Part {
 	}
 
 	function quote(Route.Part memory part, uint amountIn) internal view returns (uint) {
-		function(address, uint, bytes memory) view returns (uint) _quote;
+		function(IERC20, uint, bytes memory) view returns (uint) _quote;
 		uint quotePtr = part._quotePtr;
 		assembly ('memory-safe') {
 			_quote := quotePtr
@@ -100,7 +100,7 @@ library Part {
 
 	// note: can return bool or error string
 	function swap(Route.Part memory part, uint amountIn, address to) internal {
-		function(address, uint, bytes memory, address) _swap;
+		function(IERC20, uint, bytes memory, address) _swap;
 		uint swapPtr = part._swapPtr;
 		assembly ('memory-safe') {
 			_swap := swapPtr
