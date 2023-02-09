@@ -66,7 +66,7 @@ library Route {
 			uint dataStart = value.getBits(72, 16);
 			uint dataEnd = value.getBits(88, 16);
 			part.data = payload.slice(dataStart, dataEnd);
-			part._flags = value.getBits(104, 40);
+			part._flags = value.getBits(104, 56);
 		}
 		return route;
 	}

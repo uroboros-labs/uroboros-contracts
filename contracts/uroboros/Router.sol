@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.17;
 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
-import {Route} from "./libraries/Route.sol";
-import {Part} from "./libraries/Part.sol";
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import '@openzeppelin/contracts/utils/math/Math.sol';
+import {Route} from './libraries/Route.sol';
+import {Part} from './libraries/Part.sol';
+
+// DEV_ONLY
+import './libraries/Strings2.sol';
+import 'hardhat/console.sol';
 
 contract Router {
 	using SafeERC20 for IERC20;
 	using Part for Route.Part;
 	using Math for uint;
+
+	/// @dev DEV_ONLY
+	using Strings for *;
+	using Strings2 for *;
 
 	struct SectionDesc {
 		uint start;
@@ -44,15 +52,17 @@ contract Router {
 	function _quote(
 		Route.Part[] memory route
 	) internal view returns (uint[] memory amounts, uint skipMask) {
+		amounts = new uint[](route.length);
+		// todo free totals
 		uint[][] memory totals;
 		{
 			uint tokenMaxId;
 			for (uint i; i < route.length; i++) {
 				Route.Part memory part = route[i];
 				tokenMaxId = tokenMaxId.max(part.tokenInId());
-				tokenMaxId = tokenMaxId.max(part.tokenInId());
+				tokenMaxId = tokenMaxId.max(part.tokenOutId());
 			}
-			totals = new uint[][](tokenMaxId);
+			totals = new uint[][](tokenMaxId++);
 		}
 		for (uint i; i < totals.length; i++) {
 			totals[i] = new uint[](route.length);
@@ -72,11 +82,18 @@ contract Router {
 				}
 			}
 			part = route[i];
-			require(part.amountIn <= totalAmountIn || part.isInput(), "quote: insufficient input");
-			uint amountIn = part.amountIn.min(totalAmountIn);
+			uint amountIn = totalAmountIn;
+			if (part.amountIn > totalAmountIn) {
+				totalAmountIn = amountIn = part.amountIn;
+				// log(totals);
+				require(part.isInput(), 'quote: insufficient input');
+			}
+			// log(totals);
 			uint amountOut = part.quote(amountIn);
-			totals[tokenInId][i] -= amountIn;
-			totals[tokenOutId][i] += amountOut;
+			// console.log('totalAmountIn: %s, amountIn: %s', totalAmountIn, amountIn);
+			// console.log('totalAmountOut: %s, amountOut: %s', totalAmountOut, amountOut);
+			totals[tokenInId][i] = totalAmountIn - amountIn;
+			totals[tokenOutId][i] = totalAmountOut + amountOut;
 			amounts[i] = amountOut;
 			if (amountOut < part.amountOutMin) {
 				skipMask |= part.sectionId();
@@ -85,6 +102,7 @@ contract Router {
 				i++;
 			}
 		}
+		console.log(totals.toString());
 	}
 
 	modifier onlySelf() {
@@ -125,7 +143,7 @@ contract Router {
 				if (postBalance < preBalance + part.amountOutMin) {
 					// return-revert amounts
 					bytes memory data = abi.encode(amounts);
-					assembly ("memory-safe") {
+					assembly ('memory-safe') {
 						let size := mload(data)
 						let offset := add(data, 0x20)
 						revert(offset, size)

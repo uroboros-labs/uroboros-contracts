@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.17;
 
-import "./UrbDeployer.sol";
-import "./Route.sol";
+import './UrbDeployer.sol';
+import './Route.sol';
+import '../../common/libraries/Bits.sol';
 
 library Part {
+	using Bits for uint;
+
 	/// Amount in ptr
 	/// @notice if zero, no amount provided
 	function amountInPtr(uint256 self) internal pure returns (uint256) {
@@ -89,32 +92,47 @@ library Part {
 	function quote(Route.Part memory part, uint amountIn) internal view returns (uint) {
 		function(address, uint, bytes memory) view returns (uint) _quote;
 		uint quotePtr = part._quotePtr;
-		assembly ("memory-safe") {
+		assembly ('memory-safe') {
 			_quote := quotePtr
 		}
 		return _quote(part.tokenIn, amountIn, part.data);
 	}
 
+	// note: can return bool or error string
 	function swap(Route.Part memory part, uint amountIn, address to) internal {
 		function(address, uint, bytes memory, address) _swap;
 		uint swapPtr = part._swapPtr;
-		assembly ("memory-safe") {
+		assembly ('memory-safe') {
 			_swap := swapPtr
 		}
 		_swap(part.tokenIn, amountIn, part.data, to);
 	}
 
-	function sectionId(Route.Part memory part) internal pure returns (uint) {}
+	function sectionId(Route.Part memory part) internal pure returns (uint) {
+		return part._flags.getBits(0, 8);
+	}
 
-	function sectionDepth(Route.Part memory part) internal pure returns (uint) {}
+	function sectionDepth(Route.Part memory part) internal pure returns (uint) {
+		return part._flags.getBits(8, 8);
+	}
 
-	function sectionEnd(Route.Part memory part) internal pure returns (uint) {}
+	function sectionEnd(Route.Part memory part) internal pure returns (uint) {
+		return part._flags.getBits(16, 8);
+	}
 
-	function isInput(Route.Part memory part) internal pure returns (bool) {}
+	function isInput(Route.Part memory part) internal pure returns (bool) {
+		return part._flags.getBits(24, 8) != 0;
+	}
 
-	function isOutput(Route.Part memory part) internal pure returns (bool) {}
+	function isOutput(Route.Part memory part) internal pure returns (bool) {
+		return part._flags.getBits(32, 8) != 0;
+	}
 
-	function tokenInId(Route.Part memory part) internal pure returns (uint) {}
+	function tokenInId(Route.Part memory part) internal pure returns (uint) {
+		return part._flags.getBits(40, 8);
+	}
 
-	function tokenOutId(Route.Part memory part) internal pure returns (uint) {}
+	function tokenOutId(Route.Part memory part) internal pure returns (uint) {
+		return part._flags.getBits(48, 8);
+	}
 }
