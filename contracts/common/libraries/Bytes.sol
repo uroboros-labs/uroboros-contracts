@@ -23,8 +23,12 @@ library Bytes {
 		}
 	}
 
-	function slice(bytes calldata data, uint start, uint end) internal pure returns (bytes calldata) {
-		require(start >= end, "negative length slice");
+	function slice(
+		bytes calldata data,
+		uint start,
+		uint end
+	) internal pure returns (bytes calldata) {
+		require(start <= end, "negative length slice");
 		return data[start:end];
 	}
 

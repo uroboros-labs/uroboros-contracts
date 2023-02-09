@@ -101,7 +101,7 @@ contract Router {
 		while (desc.start < desc.end) {
 			Route.Part calldata part = route[desc.start];
 			if (desc.skipMask & part.sectionId() != 0) {
-				desc.start += part.sectionEnd();
+				desc.start = part.sectionEnd();
 			}
 			uint sectionDepth = part.sectionDepth();
 			if (sectionDepth > desc.depth) {

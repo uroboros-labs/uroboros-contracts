@@ -4,6 +4,7 @@
 	"semi": false,
 	"arrowParens": "avoid",
 	"printWidth": 100,
+	"singleQuote": true,
 	"overrides": [
 		{
 			"files": "**/*.yml",

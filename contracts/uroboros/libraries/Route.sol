@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: No License
 pragma solidity >=0.8.17;
 
-import "../../common/libraries/SafeCast.sol";
-import "../../common/libraries/Bytes.sol";
-import "../../common/libraries/Bits.sol";
-import "../adaptors/UniswapV2Adaptor.sol";
+import '../../common/libraries/SafeCast.sol';
+import '../../common/libraries/Bytes.sol';
+import '../../common/libraries/Bits.sol';
+import '../adaptors/UniswapV2Adaptor.sol';
 
 library Route {
 	using SafeCast for bytes32;
@@ -20,9 +20,6 @@ library Route {
 		address tokenOut;
 		uint amountIn;
 		uint amountOutMin;
-		// can parse data to adaptor-compatible format (messing with abi encoding)
-		// or store calldata ptr for zero-cost (messing with abi encoding a lot)
-		// + data may be repeated (add marker) (todo)
 		bytes data;
 		uint _flags; // contains non-loaded values: sectionId, ...
 		// external calls MUST be performed to SAME CONTRACT
@@ -48,25 +45,24 @@ library Route {
 			}
 			{
 				uint tmp = value.getBits(64, 8);
-				require(tmp <= uint(type(Adaptor).max), "invalid adaptor");
+				require(tmp <= uint(type(Adaptor).max), 'invalid adaptor');
 				Adaptor adaptor = Adaptor(tmp);
 				function(address, uint, bytes memory) view returns (uint) quote;
 				function(address, uint, bytes memory, address) swap;
 				if (adaptor == Adaptor.UniswapV2) {
 					quote = UniswapV2Adaptor.quote;
 					swap = UniswapV2Adaptor.swap;
+					// add data validation
 				}
 				uint quotePtr;
 				uint swapPtr;
-				assembly ("memory-safe") {
+				assembly ('memory-safe') {
 					quotePtr := quote
 					swapPtr := swap
 				}
 				part._quotePtr = quotePtr;
 				part._swapPtr = swapPtr;
 			}
-			// data duplicates:
-			// if dataStart == 0, then dataEnd contains index (<i) that points to part with data
 			uint dataStart = value.getBits(72, 16);
 			uint dataEnd = value.getBits(88, 16);
 			part.data = payload.slice(dataStart, dataEnd);
