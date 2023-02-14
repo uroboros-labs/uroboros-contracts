@@ -73,8 +73,8 @@ describe('Router', () => {
 			uniswapV2Factory,
 			token1,
 			token2,
-			'2000000000000000000',
-			'3000000000000000000'
+			'1000000000000000000',
+			'2000000000000000000'
 		)
 
 		pair02 = await createPair(
@@ -89,9 +89,13 @@ describe('Router', () => {
 			uniswapV2Factory,
 			token1,
 			token3,
-			'1000000000000000000',
-			'1000000000000000000'
+			'1010000000000000000',
+			'2000000000000000000'
 		)
+
+		// 1:2 = 1:2 = 0.5
+		// 2:3 = 1:1 = 1.0
+		// 3:1 = 7:4 = 1.75
 
 		pair14 = await createPair(
 			uniswapV2Factory,
@@ -122,6 +126,7 @@ describe('Router', () => {
 	// it('router: test2', test2)
 	// it('router: test3', test3)
 	it('router: test4', test4)
+	it('router: test5', test5)
 
 	async function test1() {
 		let route: Part[] = [
@@ -252,6 +257,9 @@ describe('Router', () => {
 		console.log(result)
 	}
 
+	// 1:2 = 1:2 = 0.5
+	// 2:3 = 1:1 = 1.0
+	// 3:1 = 7:4 = 1.75
 	// 0 -> (1 -> 2 -> 3 -> 1) -> 4 -> 0
 	async function test4() {
 		let route: Part[] = [
@@ -268,7 +276,7 @@ describe('Router', () => {
 					buyFee: 0,
 					zeroForOne: sortTokens(token0.address, token1.address),
 				}),
-				sectionId: 0,
+				sectionId: 1,
 				sectionDepth: 0,
 				sectionEnd: 5,
 				isInput: true,
@@ -287,7 +295,7 @@ describe('Router', () => {
 					buyFee: 0,
 					zeroForOne: sortTokens(token1.address, token2.address),
 				}),
-				sectionId: 1,
+				sectionId: 2,
 				sectionDepth: 1,
 				sectionEnd: 4,
 				isInput: false,
@@ -305,7 +313,7 @@ describe('Router', () => {
 					buyFee: 0,
 					zeroForOne: sortTokens(token2.address, token3.address),
 				}),
-				sectionId: 0,
+				sectionId: 2,
 				sectionDepth: 1,
 				sectionEnd: 4,
 				isInput: false,
@@ -316,7 +324,7 @@ describe('Router', () => {
 				tokenIn: token3.address,
 				tokenOut: token1.address,
 				adaptorId: AdaptorId.UniswapV2,
-				amountOutMin: '1000000000',
+				amountOutMin: '1000000000000000000000', // cycle is cancelled
 				data: encodeUniswapV2AdaptorData({
 					address: pair13.address,
 					swapFee: 30,
@@ -324,7 +332,7 @@ describe('Router', () => {
 					buyFee: 0,
 					zeroForOne: sortTokens(token3.address, token1.address),
 				}),
-				sectionId: 0,
+				sectionId: 2,
 				sectionDepth: 1,
 				sectionEnd: 4,
 				isInput: false,
@@ -342,7 +350,7 @@ describe('Router', () => {
 					buyFee: 0,
 					zeroForOne: sortTokens(token1.address, token4.address),
 				}),
-				sectionId: 0,
+				sectionId: 1,
 				sectionDepth: 0,
 				sectionEnd: 5,
 				isInput: false,
@@ -369,6 +377,72 @@ describe('Router', () => {
 		]
 		let { data } = encodeRoute(route)
 		let result = await router.callStatic.swap(data)
+		console.log(result)
+	}
+
+	async function test5() {
+		// let amount = '1000000000'
+		let amount = '10000000000'
+		let route: Part[] = [
+			{
+				// (1 -> 2)
+				tokenIn: token1.address,
+				tokenOut: token2.address,
+				adaptorId: AdaptorId.UniswapV2,
+				amountIn: amount,
+				data: encodeUniswapV2AdaptorData({
+					address: pair12.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+					zeroForOne: sortTokens(token1.address, token2.address),
+				}),
+				sectionId: 1,
+				sectionDepth: 0,
+				sectionEnd: 3,
+				isInput: true,
+				isOutput: false,
+			},
+			{
+				// (2 -> 3)
+				tokenIn: token2.address,
+				tokenOut: token3.address,
+				adaptorId: AdaptorId.UniswapV2,
+				data: encodeUniswapV2AdaptorData({
+					address: pair23.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+					zeroForOne: sortTokens(token2.address, token3.address),
+				}),
+				sectionId: 1,
+				sectionDepth: 0,
+				sectionEnd: 3,
+				isInput: false,
+				isOutput: false,
+			},
+			{
+				// (3 -> 1)
+				tokenIn: token3.address,
+				tokenOut: token1.address,
+				adaptorId: AdaptorId.UniswapV2,
+				amountOutMin: amount,
+				data: encodeUniswapV2AdaptorData({
+					address: pair13.address,
+					swapFee: 30,
+					sellFee: 0,
+					buyFee: 0,
+					zeroForOne: sortTokens(token3.address, token1.address),
+				}),
+				sectionId: 1,
+				sectionDepth: 0,
+				sectionEnd: 3,
+				isInput: false,
+				isOutput: true,
+			},
+		]
+		let { data } = encodeRoute(route)
+		let result = await router.quote(data)
 		console.log(result)
 	}
 })

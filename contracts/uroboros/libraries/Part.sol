@@ -135,4 +135,14 @@ library Part {
 	function tokenOutId(Route.Part memory part) internal pure returns (uint) {
 		return part._flags.getBits(48, 8);
 	}
+
+	// function totalInId(Route.Part memory part) internal pure returns (uint) {}
+
+	// function totalOutId(Route.Part memory part) internal pure returns (uint) {}
+
+	/// used for direct transfers to adaptor
+	function recipient(Route.Part memory part) internal pure returns (address) {}
+
+	/// markes if transfer is direct
+	function isDirect(Route.Part memory part) internal pure returns (address) {}
 }
