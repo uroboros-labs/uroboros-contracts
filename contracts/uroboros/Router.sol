@@ -38,8 +38,19 @@ contract Router {
 		SwapState memory state;
 		state.end = route.length;
 		state.skipMask = skipMask;
-		amounts = _trySwap(route, amounts, state, msg.sender);
+		uint[] memory totals = new uint[](_countTokens(route));
+		(amounts, ) = _trySwap(route, amounts, totals, state, msg.sender);
 		gasUsed -= gasleft();
+	}
+
+	function _countTokens(Route.Part[] memory route) internal pure returns (uint) {
+		uint tokenIdMax;
+		for (uint i; i < route.length; i++) {
+			Route.Part memory part = route[i];
+			tokenIdMax = tokenIdMax.max(part.tokenInId());
+			tokenIdMax = tokenIdMax.max(part.tokenOutId());
+		}
+		return tokenIdMax + 1;
 	}
 
 	function quote(bytes calldata payload) external view returns (uint[] memory, uint) {
@@ -97,16 +108,21 @@ contract Router {
 	function _trySwap(
 		Route.Part[] memory route,
 		uint[] memory amounts,
+		uint[] memory totals,
 		SwapState memory state,
 		address sender
-	) internal returns (uint[] memory) {
-		try this._swap(route, amounts, state, sender) returns (uint[] memory _amounts) {
-			return _amounts;
+	) internal returns (uint[] memory, uint[] memory) {
+		try this._swap(route, amounts, totals, state, sender) returns (
+			uint[] memory _amounts,
+			uint[] memory _totals
+		) {
+			return (_amounts, _totals);
 		} catch Error(string memory reason) {
 			revert(reason);
 		} catch (bytes memory data) {
 			// decode return-reverted amounts
-			return abi.decode(data, (uint[]));
+			uint[] memory _amounts = abi.decode(data, (uint[]));
+			return (_amounts, totals);
 		}
 	}
 
@@ -128,9 +144,10 @@ contract Router {
 	function _swap(
 		Route.Part[] calldata route,
 		uint[] memory amounts,
+		uint[] memory totals,
 		SwapState memory state,
 		address sender
-	) external onlySelf returns (uint[] memory) {
+	) external onlySelf returns (uint[] memory, uint[] memory) {
 		while (state.start < state.end) {
 			Route.Part calldata part = route[state.start];
 			if (state.skipMask & (1 << part.sectionId()) == 1) {
@@ -141,7 +158,7 @@ contract Router {
 			if (sectionDepth > state.depth) {
 				state.depth = sectionDepth;
 				state.end = part.sectionEnd();
-				amounts = _trySwap(route, amounts, state, sender);
+				(amounts, totals) = _trySwap(route, amounts, totals, state, sender);
 			} else {
 				uint amountIn = part.amountIn;
 				uint balance = part.tokenIn.balanceOf(address(this));
@@ -165,6 +182,6 @@ contract Router {
 				state.start++;
 			}
 		}
-		return amounts;
+		return (amounts, totals);
 	}
 }

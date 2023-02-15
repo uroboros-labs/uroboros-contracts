@@ -20,6 +20,8 @@ export type CompiledPart = {
 	sectionEnd: number // 1
 	isInput: boolean // 1
 	isOutput: boolean // 1
+	tokenInDestPtr: number // 2
+	tokenOutDestPtr: number // 2
 }
 
 export type Part = {
@@ -100,6 +102,8 @@ export function encodeRoute(route: Part[]): { data: Buffer; compiled: CompiledPa
 			sectionEnd: part.sectionEnd,
 			isInput: part.isInput,
 			isOutput: part.isOutput,
+			tokenInDestPtr: 0, // todo
+			tokenOutDestPtr: 0, // todo
 		}
 	})
 	// console.log(compiled)

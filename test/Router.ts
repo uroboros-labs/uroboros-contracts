@@ -122,11 +122,11 @@ describe('Router', () => {
 		)
 	})
 
-	// it('router: test1', test1)
-	// it('router: test2', test2)
-	// it('router: test3', test3)
+	it('router: test1', test1)
+	it('router: test2', test2)
+	it('router: test3', test3)
 	it('router: test4', test4)
-	// it('router: test5', test5)
+	it('router: test5', test5)
 
 	async function test1() {
 		let route: Part[] = [
