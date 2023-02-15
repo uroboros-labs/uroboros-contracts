@@ -52,72 +52,46 @@ contract Router {
 	) internal view returns (uint[] memory amounts, uint skipMask) {
 		amounts = new uint[](route.length);
 		// todo free totals
-		uint[][] memory totals2d = _newTotals2d(route);
+		uint[] memory totals = new uint[](route.length * 2);
 
 		for (uint i; i < route.length; ) {
 			Route.Part memory part = route[i];
-			uint[] memory totalsIn = totals2d[part.tokenInId()];
-			uint[] memory totalsOut = totals2d[part.tokenOutId()];
 
-			// todo use total(In/Out)Id to index totalAmount (instead of part index)
-			// this just squeezes unused partIds in totalIns array (token is unused in part)
-			// how to do reverse-mapping? (id -> isSkipped)
-			(uint totalIn, uint totalOut) = _findTotals(route, totalsIn, totalsOut, skipMask, i);
-			uint amountIn = totalIn;
-			if (part.amountIn > totalIn) {
-				totalIn = amountIn = part.amountIn;
-				require(part.isInput(), 'quote: insufficient input');
+			uint totalIn;
+			uint totalOut;
+			for (uint j; j < i; j++) {
+				Route.Part memory prevPart = route[j];
+				if (skipMask & (1 << route[j].sectionId()) == 1) continue;
+
+				if (part.tokenIn == prevPart.tokenIn) totalIn = totals[j * 2];
+				else if (part.tokenIn == prevPart.tokenOut) totalIn = totals[j * 2 + 1];
+
+				if (part.tokenOut == prevPart.tokenIn) totalOut = totals[j * 2];
+				else if (part.tokenOut == prevPart.tokenOut) totalOut = totals[j * 2 + 1];
 			}
 
-			// part.amountIn == 0 => amountIn = totalIn
-			// part.amountIn < totalIn => amountIn = part.amountIn
-			// part.amountIn > totalIn => totalIn = amountIn = part.amountIn
+			if (part.amountIn > totalIn) {
+				require(part.isInput(), 'quote: insufficient input');
+				totalIn = part.amountIn;
+			}
+
+			uint amountIn = part.amountIn == 0 ? totalIn : part.amountIn;
 			uint amountOut = part.quote(amountIn);
-			totalsIn[i] = totalIn.sub(amountIn);
-			totalsOut[i] = totalOut.add(amountOut);
+
 			amounts[i] = amountOut;
+			totals[i * 2] = totalIn.sub(amountIn);
+			if (!part.isOutput()) {
+				totals[i * 2 + 1] = totalOut.add(amountOut);
+			}
 
 			if (amountOut < part.amountOutMin) {
-				// sectionId should be 2^n, but now stored in uint8, thus capped at 8
-				// todo: mask is computed with: 1 << sectionId
-				skipMask |= part.sectionId();
+				skipMask |= (1 << part.sectionId());
 				i = part.sectionEnd();
 			} else {
 				i++;
 			}
 		}
-		console.log(totals2d.toString());
-	}
-
-	function _findTotals(
-		Route.Part[] memory route,
-		uint[] memory totalsIn,
-		uint[] memory totalsOut,
-		uint skipMask,
-		uint i
-	) internal pure returns (uint totalIn, uint totalOut) {
-		for (uint j; j < i; j++) {
-			if (skipMask & route[j].sectionId() == 0) {
-				uint tmp;
-				if ((tmp = totalsIn[j]) != 0) totalIn = tmp;
-				if ((tmp = totalsOut[j]) != 0) totalOut = tmp;
-			}
-		}
-	}
-
-	function _newTotals2d(Route.Part[] memory route) internal pure returns (uint[][] memory) {
-		uint[][] memory totals2d;
-		uint tokenMaxId;
-		for (uint i; i < route.length; i++) {
-			Route.Part memory part = route[i];
-			tokenMaxId = tokenMaxId.max(part.tokenInId());
-			tokenMaxId = tokenMaxId.max(part.tokenOutId());
-		}
-		totals2d = new uint[][](tokenMaxId + 1);
-		for (uint i; i < totals2d.length; i++) {
-			totals2d[i] = new uint[](route.length);
-		}
-		return totals2d;
+		console.log(totals.toString());
 	}
 
 	function _trySwap(
@@ -159,7 +133,7 @@ contract Router {
 	) external onlySelf returns (uint[] memory) {
 		while (state.start < state.end) {
 			Route.Part calldata part = route[state.start];
-			if (state.skipMask & part.sectionId() != 0) {
+			if (state.skipMask & (1 << part.sectionId()) == 1) {
 				state.start = part.sectionEnd();
 				continue;
 			}

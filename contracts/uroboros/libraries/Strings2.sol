@@ -2,6 +2,7 @@
 pragma solidity >=0.8.17;
 
 import '@openzeppelin/contracts/utils/Strings.sol';
+import '../Router.sol';
 
 library Strings2 {
 	using Strings for *;
@@ -26,6 +27,17 @@ library Strings2 {
 				} else {
 					s = string.concat(s, v, ']]');
 				}
+			}
+		}
+	}
+
+	function toString(uint[] memory values) internal pure returns (string memory s) {
+		s = '[';
+		for (uint i; i < values.length; i++) {
+			if (i < values.length - 1) {
+				s = string.concat(s, values[i].toString(), ', ');
+			} else {
+				s = string.concat(s, values[i].toString(), ']');
 			}
 		}
 	}
